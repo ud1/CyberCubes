@@ -11,9 +11,11 @@
 #include <libnoise/noise.h>
 #include <boost/timer/timer.hpp>
 
-const int S = 32;
+const int S = 4;
 const int SZ = 4;
 long cubeCount = 0;
+
+void checkGLError(const char *str);
 
 class GradientModule : public noise::module::Module
 {
@@ -591,7 +593,7 @@ void World::create()
 		CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE
     };
     glBufferData(GL_ARRAY_BUFFER, sizeof(oqVertices), oqVertices, GL_STATIC_DRAW); //formatting the data for the buffer
-    glBindBuffer(GL_ARRAY_BUFFER, 0); //unbind any buffers
+    //glBindBuffer(GL_ARRAY_BUFFER, 0); //unbind any buffers
 
     if (oqTriangleIndicesBufferObject == 0)
         glGenBuffers(1, &oqTriangleIndicesBufferObject); //create the buffer
@@ -615,8 +617,9 @@ void World::create()
 
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(oqIndeces), oqIndeces, GL_STATIC_DRAW); //formatting the data for the buffer
 
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); //unbind any buffers
+	glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0); //tell gl (shader!) how to interpret our vertex data
+    glBindVertexArray(0);
 
     printf("OQ glError: %d\n", glGetError());
 
@@ -706,15 +709,11 @@ void World::render(const Camera &camera)
         }
 		glUseProgram(0);
 
-
 		glUseProgram(oqShader.program);
 		if (oqShader.uniforms.count("MVP"))
 			glUniformMatrix4fv(oqShader.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
 
-		glBindBuffer(GL_ARRAY_BUFFER, oqTriangleBufferObject); //bind the buffer we're applying attributes to
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, oqTriangleIndicesBufferObject); //bind the buffer we're applying attributes to
-		glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0); //tell gl (shader!) how to interpret our vertex data
+		glBindVertexArray(oqVao);
 		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 		glDepthMask(GL_FALSE);
 
@@ -743,7 +742,8 @@ void World::render(const Camera &camera)
 			oqVisibleChunksVector.push_back(params == 1);
 
 		}
-		glDisableVertexAttribArray(0);
+		//glDisableVertexAttribArray(0);
+		glBindVertexArray(0);
 		glUseProgram(0);
 	}
 

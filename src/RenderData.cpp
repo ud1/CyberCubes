@@ -226,7 +226,15 @@ void RenderData::uploadData()
             offset += vertices[i].size() * sizeof(Vertex);
         }
     }
-    glBindBuffer(GL_ARRAY_BUFFER, 0); //unbind any buffers
+
+
+    glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
+    glVertexAttribPointer(0, 3, GL_BYTE, GL_FALSE, sizeof(Vertex), 0); //tell gl (shader!) how to interpret our vertex data
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 1, GL_SHORT, GL_FALSE, sizeof(Vertex), &((Vertex *)NULL)->textureId);
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)NULL)->l1);
+    glBindVertexArray(0);
 
 	std::cout << "vertices " << size << std::endl;
     printf("glError: %d\n", glGetError());
@@ -248,13 +256,7 @@ void RenderData::render(GLint normLocation, GLint t1Location, GLint t2Location, 
     math::ivec3 eyePos = math::ivec3(std::floor(eye.x + 0.5f), std::floor(eye.y + 0.5f), std::floor(eye.z + 0.5f));
     eyePos = math::clamp(eyePos, math::ivec3(-1, -1, -1), math::ivec3(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE)) + math::ivec3(1, 1, 1);
 
-    glBindBuffer(GL_ARRAY_BUFFER, triangleBufferObject); //bind the buffer we're applying attributes to
-    glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
-    glVertexAttribPointer(0, 3, GL_BYTE, GL_FALSE, sizeof(Vertex), 0); //tell gl (shader!) how to interpret our vertex data
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 1, GL_SHORT, GL_FALSE, sizeof(Vertex), &((Vertex *)NULL)->textureId);
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)NULL)->l1);
+    glBindVertexArray(vao);
 
     int indexOffset = 0;
     int total = 0;
@@ -320,10 +322,9 @@ void RenderData::render(GLint normLocation, GLint t1Location, GLint t2Location, 
         }
     }
 
-    glDisableVertexAttribArray(0);
-    glDisableVertexAttribArray(1);
-    glDisableVertexAttribArray(2);
     trisRendered = total * 2;
+
+    glBindVertexArray(0);
 }
 
 void RenderData::addVertexData(const Chunk &chunk)

@@ -175,12 +175,17 @@ inline bool initConf(const char *filename)
     return true;
 }
 
+void checkGLError(const char *str)
+{
+	GLenum error = glGetError();
+	if (error)
+		printf("glError: %s %d\n", str, error);
+}
+
 int main()
 {
     if (!initConf("config.lua"))
         return 1;
-
-    //return 0;
 
     Atlas atlas;
     atlas.make(2);
@@ -199,6 +204,10 @@ int main()
                                           width, height,
                                           SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 4);
+
     SDL_GLContext glContext = SDL_GL_CreateContext(window);
     if (glContext == NULL)
     {
@@ -212,11 +221,11 @@ int main()
         printf("There was an error creating the OpenGL context!\n");
         return 1;
     }
+    printf("Version %s", version);
 
     SDL_GL_MakeCurrent(window, glContext);
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetSwapInterval(1);
 
@@ -269,6 +278,7 @@ int main()
     glEnable(GL_DEPTH_TEST);
 
 
+
     GLuint frameBuffer;
     glGenFramebuffers( 1, &frameBuffer);
 
@@ -284,6 +294,7 @@ int main()
     //glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
     //glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
     glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture, 0);
+
 
     GLuint	frameBufferMaterialTexture;
     glGenTextures   ( 1, &frameBufferMaterialTexture );
@@ -303,9 +314,9 @@ int main()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+
     //NULL means reserve texture memory, but texels are undefined
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_tex, 0);
@@ -353,8 +364,6 @@ int main()
     }
     glBindFramebuffer ( GL_FRAMEBUFFER, 0);
 
-
-
     float quad[] =
     {
         -1.0f, -1.0f,
@@ -372,9 +381,12 @@ int main()
     glGenBuffers(1, &quadBufferObject);
     glBindBuffer(GL_ARRAY_BUFFER, quadBufferObject);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW); //formatting the data for the buffer
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0); //tell gl (shader!) how to interpret our vertex data
     glBindVertexArray(0);
 
+    GLuint wireframeCubeVao = 0;
+    glGenVertexArrays(1, &wireframeCubeVao);
 
     bool pause = false;
     GLenum error;
@@ -570,6 +582,7 @@ int main()
             //glDrawBuffer(GL_COLOR_ATTACHMENT0);
             //glReadBuffer(GL_COLOR_ATTACHMENT0);
             //GLenum drawBufs[] = {GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT1};
+
             //glDrawBuffers(1, drawBufs);
 
             glEnable(GL_DEPTH_TEST);
@@ -588,7 +601,6 @@ int main()
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
 
             //glFlush();
-
             glClearColor(0.5, 0.7, 1.0, 0.0);
             glClear(GL_COLOR_BUFFER_BIT);
 
@@ -596,9 +608,7 @@ int main()
             glDepthMask(GL_FALSE);
 
             glUseProgram(quadShader.program);
-            glBindBuffer(GL_ARRAY_BUFFER, quadBufferObject); //bind the buffer we're applying attributes to
-            glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0); //tell gl (shader!) how to interpret our vertex data
+            glBindVertexArray(quadVao);
 
             if (quadShader.uniforms.count("textureSampler"))
             {
@@ -634,9 +644,7 @@ int main()
             }
 
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            glDisableVertexAttribArray(0);
-            //glBindBuffer(GL_ARRAY_BUFFER, 0);
-            glUseProgram(0);
+            glBindVertexArray(0);
 
             glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -651,6 +659,7 @@ int main()
 
                     glUseProgram(wireframeBox.program);
                     glEnable(GL_DEPTH_TEST);
+                    glBindVertexArray(wireframeCubeVao);
 
                     if (wireframeBox.uniforms.count("MVP"))
                     {
@@ -663,6 +672,7 @@ int main()
                         math::vec3 pos = (math::vec3) bpos;
                         glUniform3fv(wireframeBox.uniforms["position"], 1, &pos[0]);
                     }
+
                     glLineWidth(2.0f);
                     glDrawArrays(GL_POINTS, 0, 1);
 
@@ -671,7 +681,10 @@ int main()
                         math::vec3 pos = (math::vec3) prevBPos;
                         glUniform3fv(wireframeBox.uniforms["position"], 1, &pos[0]);
                     }
+
+
                     glDrawArrays(GL_POINTS, 0, 1);
+                    glBindVertexArray(0);
 
                     if (rClicked)
                     {
@@ -699,14 +712,10 @@ int main()
             glDrawBuffer(GL_BACK);
             glReadBuffer(GL_BACK);
 
-
             //glClear(GL_DEPTH_BUFFER_BIT);
 
             glUseProgram(quadShader2.program);
-            glBindBuffer(GL_ARRAY_BUFFER, quadBufferObject); //bind the buffer we're applying attributes to
-            glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0); //tell gl (shader!) how to interpret our vertex data
-
+            glBindVertexArray(quadVao);
             if (quadShader2.uniforms.count("textureSampler"))
             {
                 glUniform1i(quadShader2.uniforms["textureSampler"], 0);
@@ -715,16 +724,10 @@ int main()
             }
 
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            glDisableVertexAttribArray(0);
-            //glBindBuffer(GL_ARRAY_BUFFER, 0);
+            glBindVertexArray(0);
             glUseProgram(0);
 
             glBindTexture(GL_TEXTURE_2D, 0);
-
-
-            error = glGetError();
-            if (error)
-                printf("glError1: %d\n", error);
 
             glFinish();
         }
