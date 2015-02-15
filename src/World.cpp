@@ -11,7 +11,7 @@
 #include <libnoise/noise.h>
 #include <boost/timer/timer.hpp>
 
-const int S = 4;
+const int S = 8;
 const int SZ = 4;
 long cubeCount = 0;
 
@@ -51,7 +51,8 @@ float World::getMaxLightNearPoint(const math::vec3 &v)
 
 float World::getMaxLightAtPoint(const math::vec3 &v)
 {
-	math::ivec3 p = math::ivec3(v.x, v.y, v.z);
+	math::vec3 fv = math::floor(v);
+	math::ivec3 p = math::ivec3(fv.x, fv.y, fv.z);
     if (v.x < 0 || v.x >= S*CHUNK_SIZE)
 		return 1.0;
 	if (v.y < 0 || v.y >= S*CHUNK_SIZE)
@@ -59,7 +60,7 @@ float World::getMaxLightAtPoint(const math::vec3 &v)
 	if (v.z < 0 || v.z >= SZ*CHUNK_SIZE)
 		return 1.0;
 
-	LightValue l = chunks[boost::make_tuple(p.x / CHUNK_SIZE, p.y / CHUNK_SIZE, p.z / CHUNK_SIZE)]->lightAt(math::ivec3(p.x % CHUNK_SIZE, p.y % CHUNK_SIZE, p.z % CHUNK_SIZE));
+	LightValue l = chunks[boost::make_tuple(eucDivChunk(p.x), eucDivChunk(p.y), eucDivChunk(p.z))]->lightAt(math::ivec3(eucModChunk(p.x), eucModChunk(p.y), eucModChunk(p.z)));
 	return (float) l / (float) MAX_LIGHT;
 }
 
@@ -72,7 +73,7 @@ CubeType World::getCubeAt(const math::ivec3 &v)
 	if (v.z < 0 || v.z >= SZ*CHUNK_SIZE)
 		return 0;
 
-	return chunks[boost::make_tuple(v.x / CHUNK_SIZE, v.y / CHUNK_SIZE, v.z / CHUNK_SIZE)]->cubeAt(math::ivec3(v.x % CHUNK_SIZE, v.y % CHUNK_SIZE, v.z % CHUNK_SIZE));
+	return chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->cubeAt(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
 }
 
 LightValue *World::getLightRef(const math::ivec3 &v)
@@ -84,28 +85,20 @@ LightValue *World::getLightRef(const math::ivec3 &v)
 	if (v.z < 0 || v.z >= SZ*CHUNK_SIZE)
 		return nullptr;
 
-	return &chunks[boost::make_tuple(v.x / CHUNK_SIZE, v.y / CHUNK_SIZE, v.z / CHUNK_SIZE)]->lightRefAt(math::ivec3(v.x % CHUNK_SIZE, v.y % CHUNK_SIZE, v.z % CHUNK_SIZE));
+	return &chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->lightRefAt(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
 }
 
 struct CoordHasher
 {
 	std::size_t operator()(const math::ivec3 &k) const
 	{
-		return ((k.x * 256) + k.y) * 256 + k.z;
+		return (k.x << 16) + (k.y << 8) + k.z;
 	}
 };
 
 math::ivec3 getChunkCoord(const math::ivec3 &p)
 {
-	math::ivec3 res = p;
-	if (res.x < 0)
-		res.x -= (CHUNK_SIZE - 1);
-	if (res.y < 0)
-		res.y -= (CHUNK_SIZE - 1);
-	if (res.z < 0)
-		res.z -= (CHUNK_SIZE - 1);
-
-	return res / math::ivec3(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE);
+	return math::ivec3(eucDivChunk(p.x), eucDivChunk(p.y), eucDivChunk(p.z));
 }
 
 void adj(int i, math::ivec3 &p)
@@ -148,7 +141,18 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 	std::unordered_set<math::ivec3, CoordHasher> updatedChunks;
 	updateLightSets.clear();
 
-	for (const math::ivec3 &blockCoord : addedBlocks)
+	std::vector<math::ivec3> newDarkBlocks = addedBlocks;
+	for (const math::ivec3 &blockCoord : removedBlocks)
+	{
+		LightValue *lp = getLightRef(blockCoord);
+
+		if (lp && *lp > 0)
+		{
+			newDarkBlocks.push_back(blockCoord);
+		}
+	}
+
+	for (const math::ivec3 &blockCoord : newDarkBlocks)
 	{
 		boost::timer::auto_cpu_timer t;
 
@@ -199,6 +203,29 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 			blockSet.swap(blockSet2);
 			blockSet2.clear();
         }
+
+
+	}
+
+	for (const math::ivec3 &blockCoord : addedBlocks)
+	{
+		LightValue *lp = getLightRef(blockCoord);
+		if (!lp)
+			continue;
+		/////////////////////
+		*lp = MAX_LIGHT/2;
+		lightSources.insert(blockCoord);
+		/////////////////////
+	}
+
+	for (const math::ivec3 &blockCoord : removedBlocks)
+	{
+		LightValue *lp = getLightRef(blockCoord);
+
+		if (lp && *lp > 0)
+		{
+			*lp = 0;
+		}
 	}
 
 	std::cout << "ZeroB " << cnt << " " << cnt2 << std::endl;

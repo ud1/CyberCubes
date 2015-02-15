@@ -22,29 +22,29 @@ bool Chunk::hasEdge(const math::ivec3 &p, Dir dir) const
     if (!cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z])
         return false;
 
-    if ((dir == XN && p.x == 0) ||
-            (dir == XP && p.x == (CHUNK_SIZE - 1)) ||
-            (dir == YN && p.y == 0) ||
-            (dir == YP && p.y == (CHUNK_SIZE - 1)) ||
-            (dir == ZN && p.z == 0) ||
-            (dir == ZP && p.z == (CHUNK_SIZE - 1)))
+    if ((dir == Dir::XN && p.x == 0) ||
+            (dir == Dir::XP && p.x == (CHUNK_SIZE - 1)) ||
+            (dir == Dir::YN && p.y == 0) ||
+            (dir == Dir::YP && p.y == (CHUNK_SIZE - 1)) ||
+            (dir == Dir::ZN && p.z == 0) ||
+            (dir == Dir::ZP && p.z == (CHUNK_SIZE - 1)))
     {
         return true;
     }
 
     switch (dir)
     {
-    case XN:
+    case Dir::XN:
         return cubes[(((p.x - 1) * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z] == 0;
-    case XP:
+    case Dir::XP:
         return cubes[(((p.x + 1) * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z] == 0;
-    case YN:
+    case Dir::YN:
         return cubes[((p.x * CHUNK_SIZE) + (p.y - 1)) * CHUNK_SIZE + p.z] == 0;
-    case YP:
+    case Dir::YP:
         return cubes[((p.x * CHUNK_SIZE) + (p.y + 1)) * CHUNK_SIZE + p.z] == 0;
-    case ZN:
+    case Dir::ZN:
         return cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z - 1] == 0;
-    case ZP:
+    case Dir::ZP:
         return cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z + 1] == 0;
     }
     assert(false);

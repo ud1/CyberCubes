@@ -79,28 +79,28 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
 	vertex.textureId = textureId;
 
 
-	if (dir == XN)
+	if (dir == Dir::XN)
 	{
 		vertex.l1 = lightAt(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
         vertex.l2 = lightAt(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
         vertex.l3 = lightAt(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
         vertex.l4 = lightAt(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
 	}
-	else if (dir == XP)
+	else if (dir == Dir::XP)
 	{
 		vertex.l1 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
         vertex.l2 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
         vertex.l3 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
         vertex.l4 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
 	}
-	else if (dir == YN)
+	else if (dir == Dir::YN)
 	{
 		vertex.l1 = lightAt(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
         vertex.l2 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
         vertex.l3 = lightAt(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
         vertex.l4 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
 	}
-	else if (dir == YP)
+	else if (dir == Dir::YP)
 	{
 		vertex.l1 = lightAt(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
         vertex.l2 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
@@ -108,14 +108,14 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
         vertex.l4 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
 
 	}
-	else if (dir == ZN)
+	else if (dir == Dir::ZN)
 	{
 		vertex.l1 = lightAt(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
         vertex.l2 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
         vertex.l3 = lightAt(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
         vertex.l4 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
 	}
-	else if (dir == ZP)
+	else if (dir == Dir::ZP)
 	{
 		vertex.l1 = lightAt(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
         vertex.l2 = lightAt(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
@@ -148,7 +148,7 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
 		vertex.l1 = vertex.l2 = vertex.l3 = vertex.l4 = chunk.lightAt(math::ivec3(pos.x, pos.y, pos.z + 1)) / (float)MAX_LIGHT * 255.0;
 	}*/
 
-	vertices[dir].push_back(vertex);
+	vertices[(size_t)dir].push_back(vertex);
 }
 
 float RenderData::lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from)
@@ -267,42 +267,42 @@ void RenderData::render(GLint normLocation, GLint t1Location, GLint t2Location, 
         {
             int delta;
 
-            if (i == XN)
+            if (i == (int) Dir::XN)
             {
                 glUniform3f(normLocation, -1.0f, 0.0f, 0.0f);
                 glUniform3f(t1Location, 0.0f, 1.0f, 0.0f);
                 glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
                 delta = eyePos.x;
             }
-            else if (i == XP)
+            else if (i == (int) Dir::XP)
             {
                 glUniform3f(normLocation, 1.0f, 0.0f, 0.0f);
                 glUniform3f(t1Location, 0.0f, 1.0f, 0.0f);
                 glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
                 delta = CHUNK_SIZE + 1 - eyePos.x;
             }
-            else if (i == YN)
+            else if (i == (int) Dir::YN)
             {
                 glUniform3f(normLocation, 0.0f, -1.0f, 0.0f);
                 glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
                 glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
                 delta = eyePos.y;
             }
-            else if (i == YP)
+            else if (i == (int) Dir::YP)
             {
                 glUniform3f(normLocation, 0.0f, 1.0f, 0.0f);
                 glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
                 glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
                 delta = CHUNK_SIZE + 1 - eyePos.y;
             }
-            else if (i == ZN)
+            else if (i == (int) Dir::ZN)
             {
                 glUniform3f(normLocation, 0.0f, 0.0f, -1.0f);
                 glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
                 glUniform3f(t2Location, 0.0f, 1.0f, 0.0f);
                 delta = eyePos.z;
             }
-            else if (i == ZP)
+            else if (i == (int) Dir::ZP)
             {
                 glUniform3f(normLocation, 0.0f, 0.0f, 1.0f);
                 glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
@@ -348,28 +348,28 @@ void RenderData::addVertexData(const Chunk &chunk)
             for (unsigned int k = 0; k < CHUNK_SIZE; ++k)
             {
                 math::ivec3 p = math::ivec3(i, j, k);
-                if (chunk.hasEdge(p, XN))
-                    addFace(p, chunk.cubeAt(p), XN, *&chunk);
+                if (chunk.hasEdge(p, Dir::XN))
+                    addFace(p, chunk.cubeAt(p), Dir::XN, *&chunk);
 
                 p = math::ivec3(CHUNK_SIZE - 1 - i, j, k);
-                if (chunk.hasEdge(p, XP))
-                    addFace(p, chunk.cubeAt(p), XP, *&chunk);
+                if (chunk.hasEdge(p, Dir::XP))
+                    addFace(p, chunk.cubeAt(p), Dir::XP, *&chunk);
 
                 p = math::ivec3(j, i, k);
-                if (chunk.hasEdge(p, YN))
-                    addFace(p, chunk.cubeAt(p), YN, *&chunk);
+                if (chunk.hasEdge(p, Dir::YN))
+                    addFace(p, chunk.cubeAt(p), Dir::YN, *&chunk);
 
                 p = math::ivec3(j, CHUNK_SIZE - 1 - i, k);
-                if (chunk.hasEdge(p, YP))
-                    addFace(p, chunk.cubeAt(p), YP, *&chunk);
+                if (chunk.hasEdge(p, Dir::YP))
+                    addFace(p, chunk.cubeAt(p), Dir::YP, *&chunk);
 
                 p = math::ivec3(j, k, i);
-                if (chunk.hasEdge(p, ZN))
-                    addFace(p, chunk.cubeAt(p), ZN, *&chunk);
+                if (chunk.hasEdge(p, Dir::ZN))
+                    addFace(p, chunk.cubeAt(p), Dir::ZN, *&chunk);
 
                 p = math::ivec3(j, k, CHUNK_SIZE - 1 - i);
-                if (chunk.hasEdge(p, ZP))
-                    addFace(p, chunk.cubeAt(p), ZP, *&chunk);
+                if (chunk.hasEdge(p, Dir::ZP))
+                    addFace(p, chunk.cubeAt(p), Dir::ZP, *&chunk);
             }
         }
 	}

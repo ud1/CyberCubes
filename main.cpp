@@ -182,10 +182,25 @@ void checkGLError(const char *str)
 		printf("glError: %s %d\n", str, error);
 }
 
+struct FloatSmoothing
+{
+	float value, period;
+
+	FloatSmoothing(float value, float period) : value(value), period(period) {}
+
+	float set(float new_val, float dt)
+	{
+		value += (new_val - value)*(1.0 - std::exp(-dt/period));
+		return value;
+	}
+};
+
 int main()
 {
     if (!initConf("config.lua"))
         return 1;
+
+	FloatSmoothing lightMultiplierSmoothing(1.0f, 1.0f);
 
     Atlas atlas;
     atlas.make(2);
@@ -633,11 +648,13 @@ int main()
 
             if (quadShader.uniforms.count("lightMultiplier"))
             {
-                lightMultiplier = 1.0/std::pow(0.01f, 1.0f - world.getMaxLightNearPoint(camera.position));
-                if (lightMultiplier > 3.0)
-                    lightMultiplier = 3.0;
+                lightMultiplier = 1.0/std::pow(0.005f, 1.0f - world.getMaxLightNearPoint(camera.position));
+                if (lightMultiplier > 10.0)
+                    lightMultiplier = 10.0;
                 if (lightMultiplier < 1.0)
                     lightMultiplier = 1.0;
+
+				lightMultiplier = lightMultiplierSmoothing.set(lightMultiplier, dt);
 
                 //std::cout << "lightMultiplier " << lightMultiplier << std::endl;
                 glUniform1f(quadShader.uniforms.count("lightMultiplier"), lightMultiplier);
