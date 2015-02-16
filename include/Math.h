@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-enum Dir
+enum class Dir
 {
     XN, XP, YN, YP, ZN, ZP
 };

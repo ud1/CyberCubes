@@ -35,34 +35,39 @@ public:
 
 float World::getMaxLightNearPoint(const math::vec3 &v)
 {
-    float res = getMaxLightAtPoint(v);
+    float res = getMaxLightAtPoint<false>(v);
     for (float i = -2.0; i <= 2.0; ++i)
     {
 		for (float j = -2.0; j <= 2.0; ++j)
 		{
 			for (float k = -2.0; k <= 2.0; ++k)
 			{
-				res = std::max(res, getMaxLightAtPoint(v + math::vec3(i, j, k)));
+				res = std::max(res, getMaxLightAtPoint<true>(v + math::vec3(i, j, k)) * dayNightLightCoef);
+				res = std::max(res, getMaxLightAtPoint<false>(v + math::vec3(i, j, k)));
 			}
 		}
     }
     return res;
 }
 
+template<bool sun>
 float World::getMaxLightAtPoint(const math::vec3 &v)
 {
 	math::vec3 fv = math::floor(v);
 	math::ivec3 p = math::ivec3(fv.x, fv.y, fv.z);
     if (v.x < 0 || v.x >= S*CHUNK_SIZE)
-		return 1.0;
+		return sun ? 1.0: 0.0;
 	if (v.y < 0 || v.y >= S*CHUNK_SIZE)
-		return 1.0;
+		return sun ? 1.0: 0.0;
 	if (v.z < 0 || v.z >= SZ*CHUNK_SIZE)
-		return 1.0;
+		return sun ? 1.0: 0.0;
 
-	LightValue l = chunks[boost::make_tuple(eucDivChunk(p.x), eucDivChunk(p.y), eucDivChunk(p.z))]->lightAt(math::ivec3(eucModChunk(p.x), eucModChunk(p.y), eucModChunk(p.z)));
+	LightValue l = chunks[boost::make_tuple(eucDivChunk(p.x), eucDivChunk(p.y), eucDivChunk(p.z))]->lightAt<sun>(math::ivec3(eucModChunk(p.x), eucModChunk(p.y), eucModChunk(p.z)));
 	return (float) l / (float) MAX_LIGHT;
 }
+
+template float World::getMaxLightAtPoint<true>(const math::vec3 &v);
+template float World::getMaxLightAtPoint<false>(const math::vec3 &v);
 
 CubeType World::getCubeAt(const math::ivec3 &v)
 {
@@ -76,6 +81,7 @@ CubeType World::getCubeAt(const math::ivec3 &v)
 	return chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->cubeAt(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
 }
 
+template<bool sun>
 LightValue *World::getLightRef(const math::ivec3 &v)
 {
 	if (v.x < 0 || v.x >= S*CHUNK_SIZE)
@@ -85,8 +91,11 @@ LightValue *World::getLightRef(const math::ivec3 &v)
 	if (v.z < 0 || v.z >= SZ*CHUNK_SIZE)
 		return nullptr;
 
-	return &chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->lightRefAt(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
+	return &chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->rawLightRefAt<sun>(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
 }
+
+template LightValue *World::getLightRef<true>(const math::ivec3 &v);
+template LightValue *World::getLightRef<false>(const math::ivec3 &v);
 
 struct CoordHasher
 {
@@ -144,7 +153,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 	std::vector<math::ivec3> newDarkBlocks = addedBlocks;
 	for (const math::ivec3 &blockCoord : removedBlocks)
 	{
-		LightValue *lp = getLightRef(blockCoord);
+		LightValue *lp = getLightRef<false>(blockCoord);
 
 		if (lp && *lp > 0)
 		{
@@ -156,7 +165,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 	{
 		boost::timer::auto_cpu_timer t;
 
-		LightValue *lp = getLightRef(blockCoord);
+		LightValue *lp = getLightRef<false>(blockCoord);
 		if (!lp)
 			continue;
 
@@ -174,7 +183,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 				{
 					math::ivec3 adjP = p;
 					adj(i, adjP);
-					LightValue *l2 = getLightRef(adjP);
+					LightValue *l2 = getLightRef<false>(adjP);
 					if (l2 && *l2 && !getCubeAt(adjP))
 					{
 						if (*l2 <= l)
@@ -209,7 +218,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 
 	for (const math::ivec3 &blockCoord : addedBlocks)
 	{
-		LightValue *lp = getLightRef(blockCoord);
+		LightValue *lp = getLightRef<false>(blockCoord);
 		if (!lp)
 			continue;
 		/////////////////////
@@ -220,7 +229,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 
 	for (const math::ivec3 &blockCoord : removedBlocks)
 	{
-		LightValue *lp = getLightRef(blockCoord);
+		LightValue *lp = getLightRef<false>(blockCoord);
 
 		if (lp && *lp > 0)
 		{
@@ -237,7 +246,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 			math::ivec3 adjP = p;
 			adj(i, adjP);
 
-			LightValue *l2 = getLightRef(adjP);
+			LightValue *l2 = getLightRef<false>(adjP);
 			if (l2 && *l2 > 1)
 			{
 				lightSources.insert(adjP);
@@ -254,7 +263,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 	{
 		for (const math::ivec3 &p : lightSources)
 		{
-			LightValue l1 = *getLightRef(p);
+			LightValue l1 = *getLightRef<false>(p);
 
 			if (l1-- > 1)
 			{
@@ -263,7 +272,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 					math::ivec3 adjP = p;
 					adj(i, adjP);
 
-					LightValue *l2 = getLightRef(adjP);
+					LightValue *l2 = getLightRef<false>(adjP);
 					if (l2 && *l2 < l1 && !getCubeAt(adjP))
 					{
 						*l2 = l1;
@@ -428,6 +437,7 @@ void World::move(math::BBox &box, const math::vec3 &delta)
 
 void World::create()
 {
+	dayNightLightCoef = 1.0f;
     solidChunk.reset(new Chunk);
     Chunk *pSolidChunk = solidChunk.get();
     pSolidChunk->isDummy = true;
@@ -531,6 +541,7 @@ void World::create()
             {
                 Chunk &chunk = *chunks[boost::make_tuple(i, j, k)];
                 chunk.updateSunLight();
+                chunk.updateLight();
             }
         }
     }
@@ -546,7 +557,7 @@ void World::create()
                 for (int k = 0; k < SZ; ++k)
                 {
                     Chunk &chunk = *chunks[boost::make_tuple(i, j, k)];
-                    updCount += chunk.updateLightIter();
+                    updCount += chunk.updateSunLightIter();
                 }
             }
         }
@@ -715,6 +726,7 @@ void World::render(const Camera &camera)
 				boost::tuple<int, int, int> &c = visibleChunksVector[i];
 				math::vec3 pos = math::vec3(c.get<0>()*CHUNK_SIZE, c.get<1>()*CHUNK_SIZE, c.get<2>()*CHUNK_SIZE);
 				glUniform3fv(worldShader.uniforms["chunkPosition"], 1, &pos[0]);
+				glUniform1f(worldShader.uniforms["dayNightLightCoef"], dayNightLightCoef);
 
 				RenderData &rd = *renderData[c];
 

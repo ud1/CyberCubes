@@ -28,6 +28,7 @@ bool WorldProvider::save(const Chunk &chunk, const math::ivec3 &pos, bool rewrit
 	std::ofstream file(getFileName(pos), std::ios::binary);
 
 	file.write((char *) chunk.cubes, sizeof(chunk.cubes));
+	file.write((char *) chunk.sunLight, sizeof(chunk.sunLight));
 	file.write((char *) chunk.light, sizeof(chunk.light));
 
 	return true;
@@ -40,6 +41,7 @@ bool WorldProvider::load(Chunk &chunk, const math::ivec3 &pos)
 		return false;
 
 	file.read((char *) chunk.cubes, sizeof(chunk.cubes));
+	file.read((char *) chunk.sunLight, sizeof(chunk.sunLight));
 	file.read((char *) chunk.light, sizeof(chunk.light));
 
 	return true;

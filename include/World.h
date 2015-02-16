@@ -36,13 +36,20 @@ class World
     GLuint oqTriangleIndicesBufferObject = 0;
     Shader oqShader;
     Shader worldShader;
+    float dayNightLightCoef;
 
     void create();
     void render(const Camera &camera);
     float getMaxLightNearPoint(const math::vec3 &v);
+
+    template<bool sun>
     float getMaxLightAtPoint(const math::vec3 &v);
+
     CubeType getCubeAt(const math::ivec3 &v);
+
+    template<bool sun>
     LightValue *getLightRef(const math::ivec3 &v);
+
     void updateLight(const std::vector<math::ivec3> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
     bool getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math::ivec3 &result, math::ivec3 &prev);
     void move(math::BBox &box, const math::vec3 &delta);

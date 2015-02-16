@@ -15,6 +15,7 @@ struct Vertex
     signed char x, y, z;
     int16_t textureId;
     unsigned char l1, l2, l3, l4;
+    unsigned char sl1, sl2, sl3, sl4;
 };
 
 struct RenderData
@@ -32,6 +33,8 @@ struct RenderData
     size_t getVideoMemUse() const;
     void render(GLint normLocation, GLint t1Location, GLint t2Location, const math::vec3 &eye);
     void addVertexData(const Chunk &chunk);
+
+    template<bool sun>
     float lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
 };
 

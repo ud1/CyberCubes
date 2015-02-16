@@ -88,6 +88,58 @@ static const struct
     "\207yU:\226lJ\226lJyU:yU:\226lJ\226lJyU:Y=)",
 };
 
+static const struct {
+  unsigned int 	 width;
+  unsigned int 	 height;
+  unsigned int 	 bytes_per_pixel; /* 2:RGB16, 3:RGB, 4:RGBA */
+  unsigned char	 pixel_data[16 * 16 * 3 + 1];
+} light_image = {
+  16, 16, 3,
+  "\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
+  "\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
+  "\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
+  "\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
+  "\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
+  "\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
+  "\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
+  "\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
+  "\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
+  "\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
+  "\356\356\356\356\356\356\356\356\356\356\356\356",
+};
+
 static void l_message (const char *pname, const char *msg)
 {
     if (pname)
@@ -348,9 +400,10 @@ int main()
     GLuint	blockTexture;
     glGenTextures   ( 1, &blockTexture );
     glBindTexture   ( GL_TEXTURE_2D_ARRAY, blockTexture );
-    glTexStorage3D  ( GL_TEXTURE_2D_ARRAY, 4, GL_RGB8, 16, 16, 2);
+    glTexStorage3D  ( GL_TEXTURE_2D_ARRAY, 4, GL_RGB8, 16, 16, 3);
     glTexSubImage3D ( GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, 16, 16, 1, GL_RGB, GL_UNSIGNED_BYTE, block_image.pixel_data);
     glTexSubImage3D ( GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, 16, 16, 1, GL_RGB, GL_UNSIGNED_BYTE, block_image2.pixel_data);
+    glTexSubImage3D ( GL_TEXTURE_2D_ARRAY, 0, 0, 0, 2, 16, 16, 1, GL_RGB, GL_UNSIGNED_BYTE, light_image.pixel_data);
     glTexParameteri ( GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
     glTexParameteri ( GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR );
     glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
@@ -411,11 +464,13 @@ int main()
 
     bool flyMode = true;
 
+	double globalT = 0.0f;
     while (bGameLoopRunning)
     {
         const boost::timer::cpu_times elapsed_times = timer.elapsed();
         boost::timer::nanosecond_type const elapsed(elapsed_times.wall);
         float dt = (double) elapsed / 1.0e9;
+        globalT += dt;
 
         timer.start();
         SDL_Event e;
@@ -588,8 +643,12 @@ int main()
 
             camera.position += dPos;
         }
+
+        world.dayNightLightCoef = 0.01f + 0.99*(1.0 + std::cos(globalT / 10.0))/2.0;
+        std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
+
         {
-            //boost::timer::auto_cpu_timer t;
+            boost::timer::auto_cpu_timer t;
             glBindFramebuffer ( GL_FRAMEBUFFER, frameBuffer );
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture, 0);
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture, 0);
@@ -616,7 +675,16 @@ int main()
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
 
             //glFlush();
-            glClearColor(0.5, 0.7, 1.0, 0.0);
+            lightMultiplier = 1.0/std::pow(0.005f, 1.0f - world.getMaxLightNearPoint(camera.position));
+            if (lightMultiplier > 10.0)
+                lightMultiplier = 10.0;
+            if (lightMultiplier < 1.0)
+                lightMultiplier = 1.0;
+
+			lightMultiplier = lightMultiplierSmoothing.set(lightMultiplier, dt);
+
+			float skyLightMultiplier = std::pow(0.005f, 1.0f - world.dayNightLightCoef);
+            glClearColor(0.5 * lightMultiplier * skyLightMultiplier, 0.7 * lightMultiplier * skyLightMultiplier, 1.0 * lightMultiplier * skyLightMultiplier, 0.0);
             glClear(GL_COLOR_BUFFER_BIT);
 
             glDisable(GL_DEPTH_TEST);
@@ -648,14 +716,6 @@ int main()
 
             if (quadShader.uniforms.count("lightMultiplier"))
             {
-                lightMultiplier = 1.0/std::pow(0.005f, 1.0f - world.getMaxLightNearPoint(camera.position));
-                if (lightMultiplier > 10.0)
-                    lightMultiplier = 10.0;
-                if (lightMultiplier < 1.0)
-                    lightMultiplier = 1.0;
-
-				lightMultiplier = lightMultiplierSmoothing.set(lightMultiplier, dt);
-
                 //std::cout << "lightMultiplier " << lightMultiplier << std::endl;
                 glUniform1f(quadShader.uniforms.count("lightMultiplier"), lightMultiplier);
             }
@@ -705,7 +765,7 @@ int main()
 
                     if (rClicked)
                     {
-						world.putBlock(prevBPos, 1);
+						world.putBlock(prevBPos, 3);
 
 						std::vector<math::ivec3> addedBlocks, removedBlocks;
 						addedBlocks.push_back(prevBPos);
