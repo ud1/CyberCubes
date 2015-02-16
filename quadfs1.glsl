@@ -17,5 +17,5 @@ void main()
   if (materialId == 0)
     discard;
   vec3 color = texture(blockSampler, vec3(light.g, light.b, materialId - 1)).rgb;
-  outputColor = vec4(color*pow(0.01, 1.0 - light.r)*lightMultiplier, 1);
+  outputColor = vec4(color*pow(0.005, 1.0 - light.r)*lightMultiplier, 1);
 }
