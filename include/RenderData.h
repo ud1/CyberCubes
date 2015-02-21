@@ -36,7 +36,7 @@ struct RenderData
     void addVertexData(const Chunk &chunk);
 
     template<LightType lt>
-    float lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
+    LightValF<lt> lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
 };
 
 #endif // RENDERDATA_H

@@ -498,7 +498,6 @@ int main()
     glGenVertexArrays(1, &wireframeCubeVao);
 
     bool pause = false;
-    GLenum error;
 
     float lightMultiplier = 1.0;
     glPolygonOffset(1.0, 1.0);
@@ -845,12 +844,21 @@ int main()
 
 						static int k = 0;
 						k++;
-						if (k % 3 == 0)
-							addedBlocks.push_back({prevBPos, {0, 20, 0, 0}});
-						else if (k % 3 == 1)
-							addedBlocks.push_back({prevBPos, {0, 0, 20, 0}});
-						else
-							addedBlocks.push_back({prevBPos, {0, 0, 0, 20}});
+						if (k % 7 == 0)
+							addedBlocks.push_back({prevBPos, {0, 50, 0, 0}});
+						else if (k % 7 == 1)
+							addedBlocks.push_back({prevBPos, {0, 0, 50, 0}});
+						else if (k % 7 == 2)
+							addedBlocks.push_back({prevBPos, {0, 0, 0, 50}});
+						else if (k % 7 == 3)
+							addedBlocks.push_back({prevBPos, {0, 50, 50, 0}});
+						else if (k % 7 == 4)
+							addedBlocks.push_back({prevBPos, {0, 50, 0, 50}});
+						else if (k % 7 == 5)
+							addedBlocks.push_back({prevBPos, {0, 0, 50, 50}});
+						else if (k % 7 == 6)
+							addedBlocks.push_back({prevBPos, {0, 50, 50, 50}});
+
 
 						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
 						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);

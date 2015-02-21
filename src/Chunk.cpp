@@ -129,11 +129,23 @@ int Chunk::updateSunLightIter()
     return res;
 }
 
+template <LightType lt>
+inline LightVal<lt> getDummyLight()
+{
+	return lt == LIGHT_SUN ? MAX_LIGHT : 0;
+}
+
+template <>
+inline LightVal<LIGHT_SUNRGBA> getDummyLight<LIGHT_SUNRGBA>()
+{
+	return math::ivec4{MAX_LIGHT, 0, 0, 0};
+}
+
 template<LightType lt>
-LightValue Chunk::lightAt(const math::ivec3 &p) const
+LightVal<lt> Chunk::lightAt(const math::ivec3 &p) const
 {
 	if (isDummy)
-		return lt == LIGHT_SUN ? MAX_LIGHT : 0;
+		return getDummyLight<lt>();
 	/*if (p.z < 0 && d->isDummy || p.z >= CHUNK_SIZE && u->isDummy)
         return MAX_LIGHT;
 
@@ -159,8 +171,6 @@ LightValue Chunk::lightAt(const math::ivec3 &p) const
 	if (p.z >= (int) CHUNK_SIZE)
 		return u->lightAt<lt>(math::ivec3(p.x, p.y, p.z - CHUNK_SIZE));
 
-    if (cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z])
-        return 0;
     return rawLightAt<lt>(p);
 }
 
@@ -168,6 +178,7 @@ template LightValue Chunk::lightAt<LIGHT_SUN>(const math::ivec3 &p) const;
 template LightValue Chunk::lightAt<LIGHT_R>(const math::ivec3 &p) const;
 template LightValue Chunk::lightAt<LIGHT_G>(const math::ivec3 &p) const;
 template LightValue Chunk::lightAt<LIGHT_B>(const math::ivec3 &p) const;
+template math::ivec4 Chunk::lightAt<LIGHT_SUNRGBA>(const math::ivec3 &p) const;
 
 CubeType Chunk::cubeAt(const math::ivec3 &p) const
 {
