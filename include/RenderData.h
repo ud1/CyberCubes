@@ -13,7 +13,7 @@
 struct Vertex
 {
     signed char x, y, z;
-    unsigned char color;
+    unsigned char colorH, colorS;
     int16_t textureId;
     unsigned char l1, l2, l3, l4;
     unsigned char sl1, sl2, sl3, sl4;

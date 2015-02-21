@@ -1,6 +1,6 @@
 #version 330
 layout(location = 0) in vec3 position;
-layout(location = 1) in float color;
+layout(location = 1) in vec2 color;
 layout(location = 2) in float textureId;
 layout(location = 3) in vec4 light;
 layout(location = 4) in vec4 sunLight;
@@ -10,7 +10,7 @@ uniform float dayNightLightCoef;
 out int gtextureId;
 out vec4 glight;
 out vec4 slight;
-out float gcolor;
+out vec2 gcolor;
 
 uniform mat4 MVP;
 

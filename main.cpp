@@ -141,27 +141,22 @@ static const struct {
   "\356\356\356\356\356\356\356\356\356\356\356\356",
 };
 
-unsigned char colorMap[256*3];
+unsigned char colorMap[256*256*3];
 void createColorMap()
 {
-    for (int h = 0; h < 32; ++h)
+    for (int h = 0; h < 256; ++h)
     {
-		for (int s = 0; s < 8; ++s)
+		for (int s = 0; s < 256; ++s)
 		{
-            int pos = h + s * 32;
-            float H = (float) h / 31.0f;
-            float S = ((float) s + 1.0) / 8.0f;
+            int pos = h + s * 256;
+            float H = (float) h / 255.0f;
+            float S = (float) s / 255.0f;
 			float R, G, B;
 			hsi_norm_rgb(H, S, 1.0f/3.0f, R, G, B);
 
 			colorMap[pos*3 + 0] = R * 255.0f;
 			colorMap[pos*3 + 1] = G * 255.0f;
 			colorMap[pos*3 + 2] = B * 255.0f;
-
-			std::cout << "hs " << h << " " << s << " "
-				<< (int) colorMap[pos*3 + 0] << " "
-				 << (int) colorMap[pos*3 + 1] << " "
-				  << (int) colorMap[pos*3 + 2] << std::endl;
 		}
     }
 }
@@ -392,7 +387,7 @@ int main()
     GLuint	frameBufferLightTexture;
     glGenTextures   ( 1, &frameBufferLightTexture );
     glBindTexture   ( GL_TEXTURE_RECTANGLE, frameBufferLightTexture );
-    glTexImage2D    ( GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
+    glTexImage2D    ( GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
     glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
     glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
     glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferLightTexture, 0);
@@ -448,12 +443,12 @@ int main()
 
     GLuint HSColorTexture;
     glGenTextures   ( 1, &HSColorTexture );
-    glBindTexture   ( GL_TEXTURE_1D, HSColorTexture );
-	glTexImage1D    ( GL_TEXTURE_1D, 0, GL_RGB8, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, colorMap);
-	glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-    glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-    glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+    glBindTexture   ( GL_TEXTURE_2D, HSColorTexture );
+	glTexImage2D    ( GL_TEXTURE_2D, 0, GL_RGB8, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, colorMap);
+	glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+    glTexParameteri ( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
 
     glDrawBuffer(GL_NONE);
@@ -725,15 +720,15 @@ int main()
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
 
             //glFlush();
-            lightMultiplier = 1.0/std::pow(0.005f, 1.0f - world.getMaxLightNearPoint(camera.position));
-            if (lightMultiplier > 20.0)
-                lightMultiplier = 20.0;
+            lightMultiplier = 1.0/std::pow(0.05f, 1.0f - world.getMaxLightNearPoint(camera.position));
+            if (lightMultiplier > 10.0)
+                lightMultiplier = 10.0;
             if (lightMultiplier < 1.0)
                 lightMultiplier = 1.0;
 
 			lightMultiplier = lightMultiplierSmoothing.set(lightMultiplier, dt);
 
-			float skyLightMultiplier = std::pow(0.005f, 1.0f - world.dayNightLightCoef);
+			float skyLightMultiplier = std::pow(0.05f, 1.0f - world.dayNightLightCoef);
             glClearColor(0.5 * lightMultiplier * skyLightMultiplier, 0.7 * lightMultiplier * skyLightMultiplier, 1.0 * lightMultiplier * skyLightMultiplier, 0.0);
             glClear(GL_COLOR_BUFFER_BIT);
 
@@ -780,7 +775,7 @@ int main()
                 //std::cout << "HSColorSampler " << HSColorTexture << std::endl;
                 glUniform1i(quadShader.uniforms["HSColorSampler"], 4);
                 glActiveTexture(GL_TEXTURE0 + 4);
-                glBindTexture(GL_TEXTURE_1D, HSColorTexture);
+                glBindTexture(GL_TEXTURE_2D, HSColorTexture);
             }
 
             checkGLError("6");
@@ -860,6 +855,8 @@ int main()
 						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
 						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);
 						world.updateLight<LIGHT_B>(addedBlocks, removedBlocks);
+
+						std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
                     }
 
                     if (lClicked)

@@ -75,6 +75,7 @@ struct LightCoefs
 float lightCoef(float l)
 {
 	return std::pow(0.05f, 1.0f - l) - 0.05*(1.0f - l);
+	//return l;
 }
 
 math::vec3 colorAt(RenderData &rd, const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from)
@@ -90,22 +91,35 @@ math::vec3 colorAt(RenderData &rd, const Chunk &chunk, const math::ivec3 &pos, c
 	return math::vec3(h, s, (r + g + b) / 3.0f);
 }
 
-unsigned char color(float H, float S)
+void colorAt(const Chunk &chunk, const math::ivec3 &pos, unsigned char &colorH, unsigned char &colorS)
 {
-	int h = H * 31.0f;
+	float r = chunk.lightAt<LIGHT_R>(pos)/MAX_LIGHT_F;
+	float g = chunk.lightAt<LIGHT_G>(pos)/MAX_LIGHT_F;
+	float b = chunk.lightAt<LIGHT_B>(pos)/MAX_LIGHT_F;
+
+	float h, s, i;
+	rgb_hsi_norm(lightCoef(r), lightCoef(g), lightCoef(b), h, s, i);
+	colorH = h * 255.0f;
+	colorS = s * 255.0f;
+}
+
+void color(float H, float S, unsigned char &colorH, unsigned char &colorS)
+{
+	int h = H * 255.0f;
 	if (h < 0)
 		h = 0;
-	if (h > 31)
-		h = 31;
+	if (h > 255)
+		h = 255;
 
-	int s = S * 8.0f - 1.0f;
+	int s = S * 255;
 	if (s < 0)
 		s = 0;
-	if (s > 7)
-		s = 7;
+	if (s > 255)
+		s = 255;
 
 	//std::cout << "HS " << (int) H << " " << (int) S << " " << ((H >> 4) | ((S >> 4) << 4)) << std::endl;
-	return h + s * 32;
+	colorH = h;
+	colorS = s;
 }
 
 void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk)
@@ -133,7 +147,8 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
         vertex.l2 = l2.z;
         vertex.l3 = l3.z;
         vertex.l4 = l4.z;
-		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
+		//color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f, vertex.colorH, vertex.colorS);
+		colorAt(chunk, math::ivec3(pos.x - 1, pos.y, pos.z), vertex.colorH, vertex.colorS);
 	}
 	else if (dir == Dir::XP)
 	{
@@ -151,7 +166,8 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
         vertex.l2 = l2.z;
         vertex.l3 = l3.z;
         vertex.l4 = l4.z;
-		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
+		//color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f, vertex.colorH, vertex.colorS);
+		colorAt(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), vertex.colorH, vertex.colorS);
 	}
 	else if (dir == Dir::YN)
 	{
@@ -169,7 +185,8 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
         vertex.l2 = l2.z;
         vertex.l3 = l3.z;
         vertex.l4 = l4.z;
-		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
+		//color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f, vertex.colorH, vertex.colorS);
+		colorAt(chunk, math::ivec3(pos.x, pos.y - 1, pos.z), vertex.colorH, vertex.colorS);
 	}
 	else if (dir == Dir::YP)
 	{
@@ -187,7 +204,8 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
         vertex.l2 = l2.z;
         vertex.l3 = l3.z;
         vertex.l4 = l4.z;
-		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
+		//color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f, vertex.colorH, vertex.colorS);
+		colorAt(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), vertex.colorH, vertex.colorS);
 	}
 	else if (dir == Dir::ZN)
 	{
@@ -205,7 +223,8 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
         vertex.l2 = l2.z;
         vertex.l3 = l3.z;
         vertex.l4 = l4.z;
-		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
+		//color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f, vertex.colorH, vertex.colorS);
+		colorAt(chunk, math::ivec3(pos.x, pos.y, pos.z - 1), vertex.colorH, vertex.colorS);
 	}
 	else if (dir == Dir::ZP)
 	{
@@ -223,7 +242,8 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
         vertex.l2 = l2.z;
         vertex.l3 = l3.z;
         vertex.l4 = l4.z;
-		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
+		//color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f, vertex.colorH, vertex.colorS);
+		colorAt(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), vertex.colorH, vertex.colorS);
 	}
 
 	/*if (dir == XN)
@@ -340,7 +360,7 @@ void RenderData::uploadData()
     glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
     glVertexAttribPointer(0, 3, GL_BYTE, GL_FALSE, sizeof(Vertex), 0); //tell gl (shader!) how to interpret our vertex data
     glEnableVertexAttribArray(1); //0 is our index, refer to "location = 0" in the vertex shader
-    glVertexAttribPointer(1, 1, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->color); //tell gl (shader!) how to interpret our vertex data
+    glVertexAttribPointer(1, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->colorH); //tell gl (shader!) how to interpret our vertex data
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 1, GL_SHORT, GL_FALSE, sizeof(Vertex), &((Vertex *)nullptr)->textureId);
     glEnableVertexAttribArray(3);

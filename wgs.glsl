@@ -7,7 +7,7 @@ uniform mat4 MVP;
 uniform vec3 norm, t1, t2;
 in vec4 glight[];
 in vec4 slight[];
-in float gcolor[];
+in vec2 gcolor[];
 in int gtextureId[];
 
 out vec4 fposition;
@@ -16,19 +16,19 @@ flat out int ftextureId;
 
 void main() {
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 - 0.5 * t2, glight[0].x);
-  flight = vec4(glight[0].x, slight[0].x, gcolor[0], 1.0);
+  flight = vec4(glight[0].x, slight[0].x, gcolor[0].x, gcolor[0].y);
   ftextureId = gtextureId[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   EmitVertex();
 
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 - 0.5 * t2, glight[0].y);
-  flight = vec4(glight[0].y, slight[0].y, gcolor[0], 1.0);
+  flight = vec4(glight[0].y, slight[0].y, gcolor[0].x, gcolor[0].y);
   ftextureId = gtextureId[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   EmitVertex();
   
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 + 0.5 * t2, glight[0].z);
-  flight = vec4(glight[0].z, slight[0].z, gcolor[0], 1.0);
+  flight = vec4(glight[0].z, slight[0].z, gcolor[0].x, gcolor[0].y);
   ftextureId = gtextureId[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   EmitVertex();
@@ -36,19 +36,19 @@ void main() {
   EndPrimitive();
 
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 - 0.5 * t2, glight[0].y);
-  flight = vec4(glight[0].y, slight[0].y, gcolor[0], 1.0);
+  flight = vec4(glight[0].y, slight[0].y, gcolor[0].x, gcolor[0].y);
   ftextureId = gtextureId[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   EmitVertex();
   
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 + 0.5 * t2, glight[0].z);
-  flight = vec4(glight[0].z, slight[0].z, gcolor[0], 1.0);
+  flight = vec4(glight[0].z, slight[0].z, gcolor[0].x, gcolor[0].y);
   ftextureId = gtextureId[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   EmitVertex();
   
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 + 0.5 * t2, glight[0].w);
-  flight = vec4(glight[0].w, slight[0].w, gcolor[0], 1.0);
+  flight = vec4(glight[0].w, slight[0].w, gcolor[0].x, gcolor[0].y);
   ftextureId = gtextureId[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   EmitVertex();

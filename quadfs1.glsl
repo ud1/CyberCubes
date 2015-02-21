@@ -6,7 +6,7 @@ uniform sampler2DRect textureSampler;
 uniform sampler2DRect lightSampler;
 uniform isampler2DRect materialSampler;
 uniform sampler2DArray blockSampler;
-uniform sampler1D HSColorSampler;
+uniform sampler2D HSColorSampler;
 uniform float lightMultiplier;
 
 void main()
@@ -19,10 +19,10 @@ void main()
   if (materialId == 0)
     discard;
   
-  vec3 colorData = texture(lightSampler, c).rgb;
+  vec4 colorData = texture(lightSampler, c);
   float v = max(colorData.x, colorData.y);
   vec3 sun_color = vec3(1, 1, 1) * (pow(0.05, 1.0 - colorData.y) - 0.05*(1.0 - colorData.y));
-  vec3 color = texture(HSColorSampler, colorData.z).rgb * (pow(0.05, 1.0 - colorData.x) - 0.05*(1.0 - colorData.x))*3.0;
+  vec3 color = texture(HSColorSampler, vec2(colorData.z, colorData.w)).rgb * (pow(0.05, 1.0 - colorData.x) - 0.05*(1.0 - colorData.x)) * 3.0;
   
   vec3 tex_color = texture(blockSampler, vec3(light.g, light.b, materialId - 1)).rgb;
   outputColor = vec4(tex_color*max(sun_color, color)*lightMultiplier, 1);
