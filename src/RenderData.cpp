@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "RenderData.h"
+#include "colorTransform.h"
 
 struct LightCoefsBlock
 {
@@ -71,6 +72,42 @@ struct LightCoefs
 
 } lightCoefs;
 
+float lightCoef(float l)
+{
+	return std::pow(0.05f, 1.0f - l) - 0.05*(1.0f - l);
+}
+
+math::vec3 colorAt(RenderData &rd, const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from)
+{
+	float r = rd.lightAt<LIGHT_R>(chunk, pos, from);
+	float g = rd.lightAt<LIGHT_G>(chunk, pos, from);
+	float b = rd.lightAt<LIGHT_B>(chunk, pos, from);
+
+    float h, s, i;
+	//rgb_hsi_norm(r, g, b, h, s, i);
+	//return math::vec3(h, s, i);
+	rgb_hsi_norm(lightCoef(r/255.0f), lightCoef(g/255.0f), lightCoef(b/255.0f), h, s, i);
+	return math::vec3(h, s, (r + g + b) / 3.0f);
+}
+
+unsigned char color(float H, float S)
+{
+	int h = H * 31.0f;
+	if (h < 0)
+		h = 0;
+	if (h > 31)
+		h = 31;
+
+	int s = S * 8.0f - 1.0f;
+	if (s < 0)
+		s = 0;
+	if (s > 7)
+		s = 7;
+
+	//std::cout << "HS " << (int) H << " " << (int) S << " " << ((H >> 4) | ((S >> 4) << 4)) << std::endl;
+	return h + s * 32;
+}
+
 void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk)
 {
 	Vertex vertex;
@@ -82,75 +119,111 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
 
 	if (dir == Dir::XN)
 	{
-		vertex.sl1 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
-        vertex.sl2 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
-        vertex.sl3 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
-        vertex.sl4 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
+		vertex.sl1 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
+        vertex.sl2 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
+        vertex.sl3 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
+        vertex.sl4 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
 
-        vertex.l1 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
-        vertex.l2 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
-        vertex.l3 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
-        vertex.l4 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
+		math::vec3 l1 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
+		math::vec3 l2 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x - 1, pos.y, pos.z));
+		math::vec3 l3 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
+		math::vec3 l4 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x - 1, pos.y, pos.z));
+
+        vertex.l1 = l1.z;
+        vertex.l2 = l2.z;
+        vertex.l3 = l3.z;
+        vertex.l4 = l4.z;
+		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
 	}
 	else if (dir == Dir::XP)
 	{
-		vertex.sl1 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
-        vertex.sl2 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
-        vertex.sl3 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
-        vertex.sl4 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
+		vertex.sl1 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
+        vertex.sl2 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
+        vertex.sl3 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
+        vertex.sl4 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
 
-        vertex.l1 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
-        vertex.l2 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
-        vertex.l3 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
-        vertex.l4 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
+        math::vec3 l1 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
+        math::vec3 l2 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x + 1, pos.y, pos.z));
+        math::vec3 l3 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
+        math::vec3 l4 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x + 1, pos.y, pos.z));
+
+        vertex.l1 = l1.z;
+        vertex.l2 = l2.z;
+        vertex.l3 = l3.z;
+        vertex.l4 = l4.z;
+		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
 	}
 	else if (dir == Dir::YN)
 	{
-		vertex.sl1 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
-        vertex.sl2 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
-        vertex.sl3 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
-        vertex.sl4 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
+		vertex.sl1 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
+        vertex.sl2 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
+        vertex.sl3 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
+        vertex.sl4 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
 
-        vertex.l1 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
-        vertex.l2 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
-        vertex.l3 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
-        vertex.l4 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
+        math::vec3 l1 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
+        math::vec3 l2 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y - 1, pos.z));
+        math::vec3 l3 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
+        math::vec3 l4 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y - 1, pos.z));
+
+        vertex.l1 = l1.z;
+        vertex.l2 = l2.z;
+        vertex.l3 = l3.z;
+        vertex.l4 = l4.z;
+		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
 	}
 	else if (dir == Dir::YP)
 	{
-		vertex.sl1 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
-        vertex.sl2 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
-        vertex.sl3 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
-        vertex.sl4 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
+		vertex.sl1 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
+        vertex.sl2 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
+        vertex.sl3 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
+        vertex.sl4 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
 
-		vertex.l1 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
-        vertex.l2 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
-        vertex.l3 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
-        vertex.l4 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
+		math::vec3 l1 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
+        math::vec3 l2 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y + 1, pos.z));
+        math::vec3 l3 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
+        math::vec3 l4 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y + 1, pos.z));
+
+        vertex.l1 = l1.z;
+        vertex.l2 = l2.z;
+        vertex.l3 = l3.z;
+        vertex.l4 = l4.z;
+		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
 	}
 	else if (dir == Dir::ZN)
 	{
-		vertex.sl1 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
-        vertex.sl2 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
-        vertex.sl3 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
-        vertex.sl4 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+		vertex.sl1 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+        vertex.sl2 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+        vertex.sl3 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+        vertex.sl4 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
 
-		vertex.l1 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
-        vertex.l2 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
-        vertex.l3 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
-        vertex.l4 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+		math::vec3 l1 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+        math::vec3 l2 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+        math::vec3 l3 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+        math::vec3 l4 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z), math::ivec3(pos.x, pos.y, pos.z - 1));
+
+        vertex.l1 = l1.z;
+        vertex.l2 = l2.z;
+        vertex.l3 = l3.z;
+        vertex.l4 = l4.z;
+		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
 	}
 	else if (dir == Dir::ZP)
 	{
-		vertex.sl1 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
-        vertex.sl2 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
-        vertex.sl3 = lightAt<true>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
-        vertex.sl4 = lightAt<true>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+		vertex.sl1 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+        vertex.sl2 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+        vertex.sl3 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+        vertex.sl4 = lightAt<LIGHT_SUN>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
 
-        vertex.l1 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
-        vertex.l2 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
-        vertex.l3 = lightAt<false>(chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
-        vertex.l4 = lightAt<false>(chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+        math::vec3 l1 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+        math::vec3 l2 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+        math::vec3 l3 = colorAt(*this, chunk, math::ivec3(pos.x, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+        math::vec3 l4 = colorAt(*this, chunk, math::ivec3(pos.x + 1, pos.y + 1, pos.z + 1), math::ivec3(pos.x, pos.y, pos.z + 1));
+
+        vertex.l1 = l1.z;
+        vertex.l2 = l2.z;
+        vertex.l3 = l3.z;
+        vertex.l4 = l4.z;
+		vertex.color = color((l1.x + l2.x + l3.x + l4.x) / 4.0f, (l1.y + l2.y + l3.y + l4.y) / 4.0f);
 	}
 
 	/*if (dir == XN)
@@ -181,7 +254,7 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
 	vertices[(size_t)dir].push_back(vertex);
 }
 
-template<bool sun>
+template<LightType lt>
 float RenderData::lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from)
 {
 	math::ivec3 fromRel = from - pos + math::ivec3(1, 1, 1);
@@ -195,7 +268,7 @@ float RenderData::lightAt(const Chunk &chunk, const math::ivec3 &pos, const math
 		{
 			for (int k = 0; k < 2; ++k)
 			{
-				LightValue l = chunk.lightAt<sun>(math::ivec3(pos.x - i, pos.y - j, pos.z - k));
+				LightValue l = chunk.lightAt<lt>(math::ivec3(pos.x - i, pos.y - j, pos.z - k));
 				value[1 - i][1 - j][1 - k] = l > 0;
 			}
 		}
@@ -218,7 +291,7 @@ float RenderData::lightAt(const Chunk &chunk, const math::ivec3 &pos, const math
 			{
 				if (lblock.resultValue[1 - i][1 - j][1 - k])
 				{
-					LightValue l = chunk.lightAt<sun>(math::ivec3(pos.x - i, pos.y - j, pos.z - k));
+					LightValue l = chunk.lightAt<lt>(math::ivec3(pos.x - i, pos.y - j, pos.z - k));
 					result += l;
 				}
 			}
@@ -228,8 +301,10 @@ float RenderData::lightAt(const Chunk &chunk, const math::ivec3 &pos, const math
     return result * lblock.multiplier;
 }
 
-template float RenderData::lightAt<true>(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
-template float RenderData::lightAt<false>(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
+template float RenderData::lightAt<LIGHT_SUN>(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
+template float RenderData::lightAt<LIGHT_R>(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
+template float RenderData::lightAt<LIGHT_G>(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
+template float RenderData::lightAt<LIGHT_B>(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
 
 void RenderData::uploadData()
 {
@@ -264,12 +339,14 @@ void RenderData::uploadData()
 
     glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
     glVertexAttribPointer(0, 3, GL_BYTE, GL_FALSE, sizeof(Vertex), 0); //tell gl (shader!) how to interpret our vertex data
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 1, GL_SHORT, GL_FALSE, sizeof(Vertex), &((Vertex *)NULL)->textureId);
+    glEnableVertexAttribArray(1); //0 is our index, refer to "location = 0" in the vertex shader
+    glVertexAttribPointer(1, 1, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->color); //tell gl (shader!) how to interpret our vertex data
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)NULL)->l1);
+    glVertexAttribPointer(2, 1, GL_SHORT, GL_FALSE, sizeof(Vertex), &((Vertex *)nullptr)->textureId);
     glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)NULL)->sl1);
+    glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->l1);
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->sl1);
     glBindVertexArray(0);
 
 	std::cout << "vertices " << size << std::endl;

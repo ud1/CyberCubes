@@ -8,6 +8,7 @@
 Chunk::Chunk()
 {
     memset(cubes, 0, sizeof(cubes));
+    memset(light, 0, sizeof(light));
     u = d = l = r = f = b = NULL;
 }
 
@@ -72,7 +73,7 @@ void Chunk::updateLight()
 
 void Chunk::updateSunLight()
 {
-    memset(sunLight, 0, sizeof(sunLight));
+    memset(light[LIGHT_SUN], 0, sizeof(light[LIGHT_SUN]));
 
     for (unsigned int x = 0; x < CHUNK_SIZE; ++x)
     {
@@ -85,12 +86,12 @@ void Chunk::updateSunLight()
             {
                 if (z > 0 && cubes[((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z - 1])
                 {
-                    sunLight[((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = MAX_LIGHT;
+                    light[LIGHT_SUN][((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = MAX_LIGHT;
                     break;
                 }
                 else
                 {
-                    sunLight[((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = MAX_LIGHT;
+                    light[LIGHT_SUN][((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = MAX_LIGHT;
                 }
             }
         }
@@ -108,17 +109,17 @@ int Chunk::updateSunLightIter()
             {
                 if (!cubes[((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z])
                 {
-                    LightValue v1 = lightAt<true>(math::ivec3(x-1, y, z));
-                    LightValue v2 = lightAt<true>(math::ivec3(x+1, y, z));
-                    LightValue v3 = lightAt<true>(math::ivec3(x, y-1, z));
-                    LightValue v4 = lightAt<true>(math::ivec3(x, y+1, z));
-                    LightValue v5 = lightAt<true>(math::ivec3(x, y, z-1));
-                    LightValue v6 = lightAt<true>(math::ivec3(x, y, z+1));
+                    LightValue v1 = lightAt<LIGHT_SUN>(math::ivec3(x-1, y, z));
+                    LightValue v2 = lightAt<LIGHT_SUN>(math::ivec3(x+1, y, z));
+                    LightValue v3 = lightAt<LIGHT_SUN>(math::ivec3(x, y-1, z));
+                    LightValue v4 = lightAt<LIGHT_SUN>(math::ivec3(x, y+1, z));
+                    LightValue v5 = lightAt<LIGHT_SUN>(math::ivec3(x, y, z-1));
+                    LightValue v6 = lightAt<LIGHT_SUN>(math::ivec3(x, y, z+1));
 
                     LightValue v = std::max(std::max(std::max(std::max(std::max(v1, v2), v3), v4), v5), v6) - 1;
-                    if (lightAt<true>(math::ivec3(x, y, z)) < v)
+                    if (lightAt<LIGHT_SUN>(math::ivec3(x, y, z)) < v)
                     {
-                        sunLight[((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = v;
+                        light[LIGHT_SUN][((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = v;
                         ++res;
 					}
                 }
@@ -128,11 +129,11 @@ int Chunk::updateSunLightIter()
     return res;
 }
 
-template<bool sun>
+template<LightType lt>
 LightValue Chunk::lightAt(const math::ivec3 &p) const
 {
 	if (isDummy)
-		return sun ? MAX_LIGHT : 0;
+		return lt == LIGHT_SUN ? MAX_LIGHT : 0;
 	/*if (p.z < 0 && d->isDummy || p.z >= CHUNK_SIZE && u->isDummy)
         return MAX_LIGHT;
 
@@ -141,30 +142,32 @@ LightValue Chunk::lightAt(const math::ivec3 &p) const
         return MAX_LIGHT;*/
 
 	if (p.x < 0)
-		return l->lightAt<sun>(math::ivec3(p.x + CHUNK_SIZE, p.y, p.z));
+		return l->lightAt<lt>(math::ivec3(p.x + CHUNK_SIZE, p.y, p.z));
 
 	if (p.x >= (int) CHUNK_SIZE)
-		return r->lightAt<sun>(math::ivec3(p.x - CHUNK_SIZE, p.y, p.z));
+		return r->lightAt<lt>(math::ivec3(p.x - CHUNK_SIZE, p.y, p.z));
 
 	if (p.y < 0)
-		return b->lightAt<sun>(math::ivec3(p.x, p.y + CHUNK_SIZE, p.z));
+		return b->lightAt<lt>(math::ivec3(p.x, p.y + CHUNK_SIZE, p.z));
 
 	if (p.y >= (int) CHUNK_SIZE)
-		return f->lightAt<sun>(math::ivec3(p.x, p.y - CHUNK_SIZE, p.z));
+		return f->lightAt<lt>(math::ivec3(p.x, p.y - CHUNK_SIZE, p.z));
 
 	if (p.z < 0)
-		return d->lightAt<sun>(math::ivec3(p.x, p.y, p.z + CHUNK_SIZE));
+		return d->lightAt<lt>(math::ivec3(p.x, p.y, p.z + CHUNK_SIZE));
 
 	if (p.z >= (int) CHUNK_SIZE)
-		return u->lightAt<sun>(math::ivec3(p.x, p.y, p.z - CHUNK_SIZE));
+		return u->lightAt<lt>(math::ivec3(p.x, p.y, p.z - CHUNK_SIZE));
 
     if (cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z])
         return 0;
-    return rawLightAt<sun>(p);
+    return rawLightAt<lt>(p);
 }
 
-template LightValue Chunk::lightAt<true>(const math::ivec3 &p) const;
-template LightValue Chunk::lightAt<false>(const math::ivec3 &p) const;
+template LightValue Chunk::lightAt<LIGHT_SUN>(const math::ivec3 &p) const;
+template LightValue Chunk::lightAt<LIGHT_R>(const math::ivec3 &p) const;
+template LightValue Chunk::lightAt<LIGHT_G>(const math::ivec3 &p) const;
+template LightValue Chunk::lightAt<LIGHT_B>(const math::ivec3 &p) const;
 
 CubeType Chunk::cubeAt(const math::ivec3 &p) const
 {

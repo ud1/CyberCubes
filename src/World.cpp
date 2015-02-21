@@ -11,7 +11,7 @@
 #include <libnoise/noise.h>
 #include <boost/timer/timer.hpp>
 
-const int S = 8;
+const int S = 4;
 const int SZ = 4;
 long cubeCount = 0;
 
@@ -35,39 +35,45 @@ public:
 
 float World::getMaxLightNearPoint(const math::vec3 &v)
 {
-    float res = getMaxLightAtPoint<false>(v);
+    float res = getMaxLightAtPoint<LIGHT_R>(v);
     for (float i = -2.0; i <= 2.0; ++i)
     {
 		for (float j = -2.0; j <= 2.0; ++j)
 		{
 			for (float k = -2.0; k <= 2.0; ++k)
 			{
-				res = std::max(res, getMaxLightAtPoint<true>(v + math::vec3(i, j, k)) * dayNightLightCoef);
-				res = std::max(res, getMaxLightAtPoint<false>(v + math::vec3(i, j, k)));
+				res = std::max(res, getMaxLightAtPoint<LIGHT_SUN>(v + math::vec3(i, j, k)) * dayNightLightCoef);
+				res = std::max(res, (
+					getMaxLightAtPoint<LIGHT_R>(v + math::vec3(i, j, k)) +
+					getMaxLightAtPoint<LIGHT_G>(v + math::vec3(i, j, k)) +
+					getMaxLightAtPoint<LIGHT_B>(v + math::vec3(i, j, k)))/3.0f
+				);
 			}
 		}
     }
     return res;
 }
 
-template<bool sun>
+template<LightType lt>
 float World::getMaxLightAtPoint(const math::vec3 &v)
 {
 	math::vec3 fv = math::floor(v);
 	math::ivec3 p = math::ivec3(fv.x, fv.y, fv.z);
     if (v.x < 0 || v.x >= S*CHUNK_SIZE)
-		return sun ? 1.0: 0.0;
+		return lt == LIGHT_SUN ? 1.0: 0.0;
 	if (v.y < 0 || v.y >= S*CHUNK_SIZE)
-		return sun ? 1.0: 0.0;
+		return lt == LIGHT_SUN ? 1.0: 0.0;
 	if (v.z < 0 || v.z >= SZ*CHUNK_SIZE)
-		return sun ? 1.0: 0.0;
+		return lt == LIGHT_SUN ? 1.0: 0.0;
 
-	LightValue l = chunks[boost::make_tuple(eucDivChunk(p.x), eucDivChunk(p.y), eucDivChunk(p.z))]->lightAt<sun>(math::ivec3(eucModChunk(p.x), eucModChunk(p.y), eucModChunk(p.z)));
+	LightValue l = chunks[boost::make_tuple(eucDivChunk(p.x), eucDivChunk(p.y), eucDivChunk(p.z))]->lightAt<lt>(math::ivec3(eucModChunk(p.x), eucModChunk(p.y), eucModChunk(p.z)));
 	return (float) l / (float) MAX_LIGHT;
 }
 
-template float World::getMaxLightAtPoint<true>(const math::vec3 &v);
-template float World::getMaxLightAtPoint<false>(const math::vec3 &v);
+template float World::getMaxLightAtPoint<LIGHT_SUN>(const math::vec3 &v);
+template float World::getMaxLightAtPoint<LIGHT_R>(const math::vec3 &v);
+template float World::getMaxLightAtPoint<LIGHT_G>(const math::vec3 &v);
+template float World::getMaxLightAtPoint<LIGHT_B>(const math::vec3 &v);
 
 CubeType World::getCubeAt(const math::ivec3 &v)
 {
@@ -81,7 +87,7 @@ CubeType World::getCubeAt(const math::ivec3 &v)
 	return chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->cubeAt(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
 }
 
-template<bool sun>
+template<LightType lt>
 LightValue *World::getLightRef(const math::ivec3 &v)
 {
 	if (v.x < 0 || v.x >= S*CHUNK_SIZE)
@@ -91,11 +97,13 @@ LightValue *World::getLightRef(const math::ivec3 &v)
 	if (v.z < 0 || v.z >= SZ*CHUNK_SIZE)
 		return nullptr;
 
-	return &chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->rawLightRefAt<sun>(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
+	return &chunks[boost::make_tuple(eucDivChunk(v.x), eucDivChunk(v.y), eucDivChunk(v.z))]->rawLightRefAt<lt>(math::ivec3(eucModChunk(v.x), eucModChunk(v.y), eucModChunk(v.z)));
 }
 
-template LightValue *World::getLightRef<true>(const math::ivec3 &v);
-template LightValue *World::getLightRef<false>(const math::ivec3 &v);
+template LightValue *World::getLightRef<LIGHT_SUN>(const math::ivec3 &v);
+template LightValue *World::getLightRef<LIGHT_R>(const math::ivec3 &v);
+template LightValue *World::getLightRef<LIGHT_G>(const math::ivec3 &v);
+template LightValue *World::getLightRef<LIGHT_B>(const math::ivec3 &v);
 
 struct CoordHasher
 {
@@ -129,8 +137,8 @@ struct UpdateLightSets
 
 	UpdateLightSets()
 	{
-		blockSet.reserve(256*256*256);
-		blockSet2.reserve(256*256*256);
+		blockSet.reserve(MAX_LIGHT*MAX_LIGHT*MAX_LIGHT);
+		blockSet2.reserve(MAX_LIGHT*MAX_LIGHT*MAX_LIGHT);
 	}
 
 	void clear()
@@ -141,7 +149,8 @@ struct UpdateLightSets
 
 } updateLightSets;
 
-void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::vector<math::ivec3> &removedBlocks)
+template<LightType lt>
+void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks)
 {
 	int cnt = 0;
 	int cnt2 = 0;
@@ -150,10 +159,27 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 	std::unordered_set<math::ivec3, CoordHasher> updatedChunks;
 	updateLightSets.clear();
 
-	std::vector<math::ivec3> newDarkBlocks = addedBlocks;
+	std::vector<math::ivec3> newDarkBlocks;
+	for (const AddedBlockLight &l : addedBlocks)
+	{
+		LightValue *lp = getLightRef<lt>(l.position);
+		if (!lp)
+			continue;
+
+		if (*lp > l.getLight<lt>())
+		{
+			newDarkBlocks.push_back(l.position);
+		}
+
+		if (l.getLight<lt>())
+		{
+			lightSources.insert(l.position);
+		}
+	}
+
 	for (const math::ivec3 &blockCoord : removedBlocks)
 	{
-		LightValue *lp = getLightRef<false>(blockCoord);
+		LightValue *lp = getLightRef<lt>(blockCoord);
 
 		if (lp && *lp > 0)
 		{
@@ -165,7 +191,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 	{
 		boost::timer::auto_cpu_timer t;
 
-		LightValue *lp = getLightRef<false>(blockCoord);
+		LightValue *lp = getLightRef<lt>(blockCoord);
 		if (!lp)
 			continue;
 
@@ -183,10 +209,10 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 				{
 					math::ivec3 adjP = p;
 					adj(i, adjP);
-					LightValue *l2 = getLightRef<false>(adjP);
-					if (l2 && *l2 && !getCubeAt(adjP))
+					LightValue *l2 = getLightRef<lt>(adjP);
+					if (l2 && *l2)
 					{
-						if (*l2 <= l)
+						if (*l2 <= l && !getCubeAt(adjP))
 						{
 							blockSet2.push_back(adjP);
 							*l2 = 0;
@@ -212,24 +238,20 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 			blockSet.swap(blockSet2);
 			blockSet2.clear();
         }
-
-
 	}
 
-	for (const math::ivec3 &blockCoord : addedBlocks)
+	for (const AddedBlockLight &l : addedBlocks)
 	{
-		LightValue *lp = getLightRef<false>(blockCoord);
+		LightValue *lp = getLightRef<lt>(l.position);
 		if (!lp)
 			continue;
-		/////////////////////
-		*lp = MAX_LIGHT/2;
-		lightSources.insert(blockCoord);
-		/////////////////////
+
+		*lp = l.getLight<lt>();
 	}
 
 	for (const math::ivec3 &blockCoord : removedBlocks)
 	{
-		LightValue *lp = getLightRef<false>(blockCoord);
+		LightValue *lp = getLightRef<lt>(blockCoord);
 
 		if (lp && *lp > 0)
 		{
@@ -246,7 +268,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 			math::ivec3 adjP = p;
 			adj(i, adjP);
 
-			LightValue *l2 = getLightRef<false>(adjP);
+			LightValue *l2 = getLightRef<lt>(adjP);
 			if (l2 && *l2 > 1)
 			{
 				lightSources.insert(adjP);
@@ -263,7 +285,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 	{
 		for (const math::ivec3 &p : lightSources)
 		{
-			LightValue l1 = *getLightRef<false>(p);
+			LightValue l1 = *getLightRef<lt>(p);
 
 			if (l1-- > 1)
 			{
@@ -272,7 +294,7 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 					math::ivec3 adjP = p;
 					adj(i, adjP);
 
-					LightValue *l2 = getLightRef<false>(adjP);
+					LightValue *l2 = getLightRef<lt>(adjP);
 					if (l2 && *l2 < l1 && !getCubeAt(adjP))
 					{
 						*l2 = l1;
@@ -307,6 +329,10 @@ void World::updateLight(const std::vector<math::ivec3> &addedBlocks, const std::
 		chunks[boost::make_tuple(p.x, p.y, p.z)]->isDirty = true;
 	}
 }
+
+template void World::updateLight<LIGHT_R>(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
+template void World::updateLight<LIGHT_G>(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
+template void World::updateLight<LIGHT_B>(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
 
 bool World::getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math::ivec3 &result, math::ivec3 &prev)
 {

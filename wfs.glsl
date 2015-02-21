@@ -1,8 +1,10 @@
 #version 330
 
 layout(location = 0) out vec4 outputColor;
-layout(location = 1) out int outputMaterial;
+layout(location = 1) out vec4 outputLight;
+layout(location = 2) out int outputMaterial;
 in vec4 fposition;
+in vec4 flight;
 flat in int ftextureId;
 
 uniform vec3 norm;
@@ -21,4 +23,5 @@ void main()
     outputColor = vec4(lightValue, coord.xy, texCount);
   
   outputMaterial = ftextureId;
+  outputLight = flight;
 }

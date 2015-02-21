@@ -13,6 +13,7 @@
 struct Vertex
 {
     signed char x, y, z;
+    unsigned char color;
     int16_t textureId;
     unsigned char l1, l2, l3, l4;
     unsigned char sl1, sl2, sl3, sl4;
@@ -34,7 +35,7 @@ struct RenderData
     void render(GLint normLocation, GLint t1Location, GLint t2Location, const math::vec3 &eye);
     void addVertexData(const Chunk &chunk);
 
-    template<bool sun>
+    template<LightType lt>
     float lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
 };
 

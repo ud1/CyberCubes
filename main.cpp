@@ -15,6 +15,7 @@
 #include "World.h"
 #include "Frustum.h"
 #include "Shader.h"
+#include "colorTransform.h"
 #include <lua.h>
 #include <lualib.h>
 #include <tolua.h>
@@ -140,6 +141,31 @@ static const struct {
   "\356\356\356\356\356\356\356\356\356\356\356\356",
 };
 
+unsigned char colorMap[256*3];
+void createColorMap()
+{
+    for (int h = 0; h < 32; ++h)
+    {
+		for (int s = 0; s < 8; ++s)
+		{
+            int pos = h + s * 32;
+            float H = (float) h / 31.0f;
+            float S = ((float) s + 1.0) / 8.0f;
+			float R, G, B;
+			hsi_norm_rgb(H, S, 1.0f/3.0f, R, G, B);
+
+			colorMap[pos*3 + 0] = R * 255.0f;
+			colorMap[pos*3 + 1] = G * 255.0f;
+			colorMap[pos*3 + 2] = B * 255.0f;
+
+			std::cout << "hs " << h << " " << s << " "
+				<< (int) colorMap[pos*3 + 0] << " "
+				 << (int) colorMap[pos*3 + 1] << " "
+				  << (int) colorMap[pos*3 + 2] << std::endl;
+		}
+    }
+}
+
 static void l_message (const char *pname, const char *msg)
 {
     if (pname)
@@ -252,6 +278,9 @@ int main()
     if (!initConf("config.lua"))
         return 1;
 
+	createColorMap();
+	//return 0;
+
 	FloatSmoothing lightMultiplierSmoothing(1.0f, 1.0f);
 
     Atlas atlas;
@@ -355,12 +384,18 @@ int main()
     GLuint	frameBufferTexture;
     glGenTextures   ( 1, &frameBufferTexture );
     glBindTexture   ( GL_TEXTURE_RECTANGLE, frameBufferTexture );
-    glTexImage2D    ( GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL );
+    glTexImage2D    ( GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
     glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
     glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-    //glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-    //glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
     glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture, 0);
+
+    GLuint	frameBufferLightTexture;
+    glGenTextures   ( 1, &frameBufferLightTexture );
+    glBindTexture   ( GL_TEXTURE_RECTANGLE, frameBufferLightTexture );
+    glTexImage2D    ( GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL );
+    glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferLightTexture, 0);
 
 
     GLuint	frameBufferMaterialTexture;
@@ -372,7 +407,7 @@ int main()
     glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
     //glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
     //glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-    glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture, 0);
+    glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture, 0);
 
     GLuint	depth_tex;
     glGenTextures(1, &depth_tex);
@@ -411,14 +446,24 @@ int main()
     glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LOD, 4);
 
+    GLuint HSColorTexture;
+    glGenTextures   ( 1, &HSColorTexture );
+    glBindTexture   ( GL_TEXTURE_1D, HSColorTexture );
+	glTexImage1D    ( GL_TEXTURE_1D, 0, GL_RGB8, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, colorMap);
+	glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+    glTexParameteri ( GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
 
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
 
     GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0,
-                            GL_COLOR_ATTACHMENT1
+                            GL_COLOR_ATTACHMENT1,
+                            GL_COLOR_ATTACHMENT2
                            };
-    glDrawBuffers(2,drawBuffers);
+    glDrawBuffers(3,drawBuffers);
 
     GLenum status;
     status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -429,6 +474,7 @@ int main()
         break;
     default:
         std::cout << "FBO error " << status << std::endl;
+        return 0;
     }
     glBindFramebuffer ( GL_FRAMEBUFFER, 0);
 
@@ -645,13 +691,15 @@ int main()
         }
 
         world.dayNightLightCoef = 0.01f + 0.99*(1.0 + std::cos(globalT / 10.0))/2.0;
-        std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
+        //std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
 
         {
-            boost::timer::auto_cpu_timer t;
+			checkGLError("1");
+            //boost::timer::auto_cpu_timer t;
             glBindFramebuffer ( GL_FRAMEBUFFER, frameBuffer );
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture, 0);
-            glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture, 0);
+            glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferLightTexture, 0);
+            glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture, 0);
 
             //glDrawBuffer(GL_COLOR_ATTACHMENT0);
             //glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -666,18 +714,20 @@ int main()
             glClear(GL_COLOR_BUFFER_BIT);
             glClear(GL_DEPTH_BUFFER_BIT);
 
+			checkGLError("2");
             //glEnable(GL_POLYGON_OFFSET_FILL);
             world.render(camera);
             //glDisable(GL_POLYGON_OFFSET_FILL);
 
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, 0, 0);
+            glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_RECTANGLE, 0, 0);
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
 
             //glFlush();
             lightMultiplier = 1.0/std::pow(0.005f, 1.0f - world.getMaxLightNearPoint(camera.position));
-            if (lightMultiplier > 10.0)
-                lightMultiplier = 10.0;
+            if (lightMultiplier > 20.0)
+                lightMultiplier = 20.0;
             if (lightMultiplier < 1.0)
                 lightMultiplier = 1.0;
 
@@ -693,6 +743,8 @@ int main()
             glUseProgram(quadShader.program);
             glBindVertexArray(quadVao);
 
+            checkGLError("3");
+
             if (quadShader.uniforms.count("textureSampler"))
             {
                 glUniform1i(quadShader.uniforms["textureSampler"], 0);
@@ -700,30 +752,56 @@ int main()
                 glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture);
             }
 
+            if (quadShader.uniforms.count("lightSampler"))
+            {
+                glUniform1i(quadShader.uniforms["lightSampler"], 1);
+                glActiveTexture(GL_TEXTURE0 + 1);
+                glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferLightTexture);
+            }
+
             if (quadShader.uniforms.count("materialSampler"))
             {
-                glUniform1i(quadShader.uniforms["materialSampler"], 1);
-                glActiveTexture(GL_TEXTURE0 + 1);
+                glUniform1i(quadShader.uniforms["materialSampler"], 2);
+                glActiveTexture(GL_TEXTURE0 + 2);
                 glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture);
             }
 
             if (quadShader.uniforms.count("blockSampler"))
             {
-                glUniform1i(quadShader.uniforms["blockSampler"], 2);
-                glActiveTexture(GL_TEXTURE0 + 2);
+                glUniform1i(quadShader.uniforms["blockSampler"], 3);
+                glActiveTexture(GL_TEXTURE0 + 3);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
             }
+
+            checkGLError("5");
+
+            if (quadShader.uniforms.count("HSColorSampler"))
+            {
+                //std::cout << "HSColorSampler " << HSColorTexture << std::endl;
+                glUniform1i(quadShader.uniforms["HSColorSampler"], 4);
+                glActiveTexture(GL_TEXTURE0 + 4);
+                glBindTexture(GL_TEXTURE_1D, HSColorTexture);
+            }
+
+            checkGLError("6");
 
             if (quadShader.uniforms.count("lightMultiplier"))
             {
                 //std::cout << "lightMultiplier " << lightMultiplier << std::endl;
-                glUniform1f(quadShader.uniforms.count("lightMultiplier"), lightMultiplier);
+                glUniform1f(quadShader.uniforms["lightMultiplier"], lightMultiplier);
             }
 
+            checkGLError("7");
+
+
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            checkGLError("7_1");
             glBindVertexArray(0);
 
             glBindTexture(GL_TEXTURE_2D, 0);
+            glBindTexture(GL_TEXTURE_1D, 0);
+
+            checkGLError("8");
 
             {
                 math::vec3 dir = camera.transform(1.0f, 0.0f, 0.0f);
@@ -767,21 +845,38 @@ int main()
                     {
 						world.putBlock(prevBPos, 3);
 
-						std::vector<math::ivec3> addedBlocks, removedBlocks;
-						addedBlocks.push_back(prevBPos);
-						world.updateLight(addedBlocks, removedBlocks);
+						std::vector<AddedBlockLight> addedBlocks;
+						std::vector<math::ivec3> removedBlocks;
+
+						static int k = 0;
+						k++;
+						if (k % 3 == 0)
+							addedBlocks.push_back({prevBPos, {0, 20, 0, 0}});
+						else if (k % 3 == 1)
+							addedBlocks.push_back({prevBPos, {0, 0, 20, 0}});
+						else
+							addedBlocks.push_back({prevBPos, {0, 0, 0, 20}});
+
+						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
+						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);
+						world.updateLight<LIGHT_B>(addedBlocks, removedBlocks);
                     }
 
                     if (lClicked)
                     {
 						world.putBlock(bpos, 0);
 
-						std::vector<math::ivec3> addedBlocks, removedBlocks;
+						std::vector<AddedBlockLight> addedBlocks;
+						std::vector<math::ivec3> removedBlocks;
 						removedBlocks.push_back(bpos);
-						world.updateLight(addedBlocks, removedBlocks);
+						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
+						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);
+						world.updateLight<LIGHT_B>(addedBlocks, removedBlocks);
                     }
                 }
             }
+
+			checkGLError("9");
 
             glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
             glBindFramebuffer ( GL_FRAMEBUFFER, 0);

@@ -16,6 +16,18 @@
 struct Chunk;
 struct RenderData;
 
+struct AddedBlockLight
+{
+	math::ivec3 position;
+	LightValue lightColor[LIGHT_COUNT];
+
+	template<LightType lt>
+	LightValue getLight() const
+	{
+		return lightColor[lt];
+	}
+};
+
 class World
 {
     public:
@@ -42,15 +54,16 @@ class World
     void render(const Camera &camera);
     float getMaxLightNearPoint(const math::vec3 &v);
 
-    template<bool sun>
+    template<LightType lt>
     float getMaxLightAtPoint(const math::vec3 &v);
 
     CubeType getCubeAt(const math::ivec3 &v);
 
-    template<bool sun>
+    template<LightType lt>
     LightValue *getLightRef(const math::ivec3 &v);
 
-    void updateLight(const std::vector<math::ivec3> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
+	template<LightType lt>
+    void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
     bool getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math::ivec3 &result, math::ivec3 &prev);
     void move(math::BBox &box, const math::vec3 &delta);
     bool putBlock(const math::ivec3 &v, CubeType c);

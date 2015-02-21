@@ -7,9 +7,18 @@
 typedef signed char LightValue;
 typedef uint16_t CubeType;
 constexpr int MAX_LIGHT = 63;
+constexpr float MAX_LIGHT_F = MAX_LIGHT;
 constexpr size_t CHUNK_SIZE_LOG2 = 5;
 constexpr size_t CHUNK_SIZE = 1 << CHUNK_SIZE_LOG2;
 constexpr size_t CHUNK_SIZE_M1 = CHUNK_SIZE - 1;
+
+enum LightType {
+	LIGHT_SUN = 0,
+	LIGHT_R = 1,
+	LIGHT_G = 2,
+	LIGHT_B = 3,
+	LIGHT_COUNT = 4
+};
 
 constexpr int eucModChunk(int v)
 {
@@ -29,8 +38,7 @@ struct Chunk
 	bool isDirty = false;
 
     CubeType cubes[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
-    LightValue light[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
-    LightValue sunLight[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
+    LightValue light[LIGHT_COUNT][CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
 
     Chunk();
 
@@ -41,22 +49,22 @@ struct Chunk
     int updateSunLightIter();
 
 
-    template<bool sun>
+    template<LightType lt>
     LightValue lightAt(const math::ivec3 &p) const;
 
-    template<bool sun>
+    template<LightType lt>
     LightValue rawLightAt(const math::ivec3 &p) const
     {
-		return (sun ? sunLight : light)[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
+		return light[lt][((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
     }
 
-    template<bool sun>
+    template<LightType lt>
     LightValue& rawLightRefAt(const math::ivec3 &p)
     {
-		return (sun ? sunLight : light)[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
+		return light[lt][((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
     }
 
-	template<bool sun>
+	template<LightType lt>
     LightValue &lightRefAt(const math::ivec3 &p);
 
     CubeType cubeAt(const math::ivec3 &p) const;
