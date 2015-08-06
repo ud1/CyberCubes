@@ -1,7 +1,7 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include <Math.h>
+#include "Math.h"
 #include <ostream>
 
 class Camera

@@ -1,6 +1,8 @@
 #include "Block.h"
 #include <unordered_map>
 #include <iostream>
+#include "Chunk.h"
+#include "Math.h"
 
 typedef std::unordered_map<int, Block> BlocksById;
 typedef std::unordered_map<std::string, const Block *> BlocksByName;
@@ -12,12 +14,18 @@ Block::Block()
 {
 	opaque = true;
 	lightOpacity = 0;
-	lightValue = 0;
+	lightValueSun = lightValueR = lightValueG = lightValueB = 0;
 	hardness = 1.0;
 }
 
 void Block::registerBlock()
 {
+	lightValueSun = clamp(lightValueSun, 0, MAX_LIGHT);
+	lightValueR   = clamp(lightValueR,   0, MAX_LIGHT);
+	lightValueG   = clamp(lightValueG,   0, MAX_LIGHT);
+	lightValueB   = clamp(lightValueB,   0, MAX_LIGHT);
+
+	
 	blocksById[id] = *this;
 	blocksByName[name] = &blocksById[id];
 	std::cout << "Register block, id = " << id << ", name = " << name << std::endl;

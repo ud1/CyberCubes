@@ -3,16 +3,20 @@
 
 #include "Math.h"
 #include <stdint.h>
+#include <atomic>
 
 typedef signed char LightValue;
 typedef uint16_t CubeType;
-constexpr int MAX_LIGHT = 63;
+constexpr int MAX_LIGHT = 31;
 constexpr float MAX_LIGHT_F = MAX_LIGHT;
 constexpr size_t CHUNK_SIZE_LOG2 = 5;
 constexpr size_t CHUNK_SIZE = 1 << CHUNK_SIZE_LOG2;
+constexpr int CHUNK_SIZE_I = CHUNK_SIZE;
+constexpr float CHUNK_SIZE_F = CHUNK_SIZE;
 constexpr size_t CHUNK_SIZE_M1 = CHUNK_SIZE - 1;
 
-enum LightType {
+enum LightType
+{
 	LIGHT_SUN = 0,
 	LIGHT_R = 1,
 	LIGHT_G = 2,
@@ -21,11 +25,21 @@ enum LightType {
 };
 constexpr size_t LIGHT_COUNT = 4;
 
+using Tick = size_t;
+
 template<LightType t>
-struct LightVal_t {using type = LightValue; using ftype = float;};
+struct LightVal_t
+{
+	using type = LightValue;
+	using ftype = float;
+};
 
 template<>
-struct LightVal_t<LIGHT_SUNRGBA> {using type = math::ivec4; using ftype = math::vec4;};
+struct LightVal_t<LIGHT_SUNRGBA>
+{
+	using type = math::ivec4;
+	using ftype = math::vec4;
+};
 
 template<LightType t>
 using LightVal = typename LightVal_t<t>::type;
@@ -68,49 +82,87 @@ constexpr int eucDivChunk(int v)
 	return v >> CHUNK_SIZE_LOG2;
 }
 
+inline math::ivec3 floorCoord(const math::vec3 &c)
+{
+	math::vec3 f = math::floor(c);
+	return math::ivec3(f.x, f.y, f.z);
+}
+
+inline math::vec3 i2f(const math::ivec3 &c)
+{
+	return math::vec3(c.x, c.y, c.z);
+}
+
+inline math::ivec3 eucDivChunk(const math::ivec3 &c)
+{
+	return  math::ivec3(eucDivChunk(c.x), eucDivChunk(c.y), eucDivChunk(c.z));
+}
+
+inline math::ivec3 eucModChunk(const math::ivec3 &c)
+{
+	return  math::ivec3(eucModChunk(c.x), eucModChunk(c.y), eucModChunk(c.z));
+}
+
 struct Chunk;
 
 template<LightType lt>
 LightVal<lt> rawLightAt(const Chunk &ch, const math::ivec3 &p);
+
+struct SunLightPropagationLayer
+{
+	unsigned char numBlocks[CHUNK_SIZE*CHUNK_SIZE];
+	
+	unsigned char &valueAt(int x, int y)
+	{
+		return numBlocks[(x * CHUNK_SIZE) + y];
+	}
+	
+	bool hasZeros() const;
+};
 
 struct Chunk
 {
 	Chunk *u, *d, *l, *r, *b, *f;
 	bool isDummy = false;
 	bool isDirty = false;
+	
+	std::atomic_bool isLoaded, isLighted, isSunLighted;
+	Tick touchTick;
 
-    CubeType cubes[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
-    LightValue light[LIGHT_COUNT][CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
+	CubeType cubes[CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
+	LightValue light[LIGHT_COUNT][CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
 
-    Chunk();
+	Chunk();
 
-    void put(const math::ivec3 &p, int type);
-    bool hasEdge(const math::ivec3 &p, Dir dir) const;
-    void updateLight();
-    void updateSunLight();
-    int updateSunLightIter();
+	void put(const math::ivec3 &p, int type);
+	bool hasEdge(const math::ivec3 &p, Dir dir) const;
+	void updateLight();
+	void updateSunLight();
+	int updateSunLightIter();
 
-
-    template<LightType lt>
-    LightVal<lt> lightAt(const math::ivec3 &p) const;
-
-    template<LightType lt>
-    LightVal<lt> rawLightAt(const math::ivec3 &p) const
-    {
-		return ::rawLightAt<lt>(*this, p);
-    }
-
-    template<LightType lt>
-    LightValue& rawLightRefAt(const math::ivec3 &p)
-    {
-		return light[lt][((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
-    }
 
 	template<LightType lt>
-    LightValue &lightRefAt(const math::ivec3 &p);
+	LightVal<lt> lightAt(const math::ivec3 &p) const;
 
-    CubeType cubeAt(const math::ivec3 &p) const;
-    int getSunLight(int x, int y) const;
+	template<LightType lt>
+	LightVal<lt> rawLightAt(const math::ivec3 &p) const
+	{
+		return ::rawLightAt<lt>(*this, p);
+	}
+
+	template<LightType lt>
+	LightValue &rawLightRefAt(const math::ivec3 &p)
+	{
+		return light[lt][((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
+	}
+
+	template<LightType lt>
+	LightValue &lightRefAt(const math::ivec3 &p);
+
+	CubeType cubeAt(const math::ivec3 &p) const;
+	int getSunLight(int x, int y) const;
+	
+	void computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const;
 };
 
 template<LightType lt>
@@ -123,8 +175,20 @@ template<>
 inline math::ivec4 rawLightAt<LIGHT_SUNRGBA>(const Chunk &ch, const math::ivec3 &p)
 {
 	size_t pos = ((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z;
+
 	return math::ivec4(ch.light[LIGHT_SUN][pos], ch.light[LIGHT_R][pos], ch.light[LIGHT_G][pos], ch.light[LIGHT_B][pos]);
 }
+
+
+using IntCoord = math::ivec3;
+
+struct IntCoordHasher
+{
+	std::size_t operator()(const IntCoord &k) const
+	{
+		return (k.x * 256 * 256) + (k.y * 256) + k.z;
+	}
+};
 
 
 #endif // CHUNK_H

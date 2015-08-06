@@ -12,31 +12,41 @@
 
 struct Vertex
 {
-    signed char x, y, z;
-    unsigned char colorH, colorS;
-    int16_t textureId;
-    unsigned char l1, l2, l3, l4;
-    unsigned char sl1, sl2, sl3, sl4;
+	signed char x, y, z;
+	unsigned char colorH, colorS;
+	int16_t textureId;
+	unsigned char l1, l2, l3, l4;
+	unsigned char sl1, sl2, sl3, sl4;
 };
 
 struct RenderData
 {
-    std::vector<Vertex> vertices[6];
-    std::vector<int> layerIndices[6];
-    int trisRendered;
+	~RenderData();
+	
+	std::vector<Vertex> vertices[6];
+	std::vector<int> layerIndices[6];
+	int trisRendered;
+	
 
+	GLuint vao = 0;
+	GLuint triangleBufferObject = 0;
 
-    GLuint vao = 0;
-    GLuint triangleBufferObject = 0;
+	void addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk);
+	void uploadData();
+	size_t getVideoMemUse() const;
+	void render(GLint normLocation, GLint t1Location, GLint t2Location, const math::vec3 &eye, Tick tick);
+	void addVertexData(const Chunk &chunk);
 
-    void addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk);
-    void uploadData();
-    size_t getVideoMemUse() const;
-    void render(GLint normLocation, GLint t1Location, GLint t2Location, const math::vec3 &eye);
-    void addVertexData(const Chunk &chunk);
-
-    template<LightType lt>
-    LightValF<lt> lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
+	template<LightType lt>
+	LightValF<lt> lightAt(const Chunk &chunk, const math::ivec3 &pos, const math::ivec3 &from);
+	
+	Tick getLastRenderTick() const
+	{
+		return _renderTick;
+	}
+	
+private:
+	Tick _renderTick = 0;
 };
 
 #endif // RENDERDATA_H

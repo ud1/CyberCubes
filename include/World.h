@@ -2,9 +2,8 @@
 #define WORLD_H
 
 #include <map>
+#include <unordered_map>
 #include <memory>
-#include <boost/tuple/tuple.hpp>
-#include <boost/tuple/tuple_comparison.hpp>
 #include <GL/glew.h>
 #include <vector>
 #include "Math.h"
@@ -12,8 +11,15 @@
 #include "Shader.h"
 #include "Camera.h"
 #include "WorldProvider.h"
+#include "Chunk.h"
+#include "Player.h"
+#include "BlockingQueue.hpp"
+#include "GLQueryPool.h"
 
-struct Chunk;
+#include <thread>
+#include <memory>
+#include <atomic>
+
 struct RenderData;
 
 struct AddedBlockLight
@@ -30,43 +36,97 @@ struct AddedBlockLight
 
 class World
 {
-    public:
-    typedef boost::tuple<int, int, int> Coord;
-    typedef std::unique_ptr<Chunk> PChunk;
-    typedef std::unique_ptr<RenderData> PRenderData;
+public:
+	World();
+	~World();
+	
+	typedef std::unique_ptr<Chunk> PChunk;
+	typedef std::unique_ptr<RenderData> PRenderData;
 
 	PChunk solidChunk;
 
-    std::map<Coord, PChunk > chunks;
-    std::map<Coord, PRenderData > renderData;
-    std::map<Coord, GLuint> oqIds;
+	typedef std::unordered_map<IntCoord, PChunk, IntCoordHasher> ChunkMap;
+	ChunkMap chunks, pendingChunks;
+	
+	typedef std::unordered_map<IntCoord, PRenderData, IntCoordHasher> RenderDataMap;
+	RenderDataMap renderData;
+	
+	typedef std::unordered_map<IntCoord, SunLightPropagationLayer, IntCoordHasher> SunLightPropagationLayerMap;
+	SunLightPropagationLayerMap sunLightPropagationLayerMap;
+	
+	cyberCubes::GLQueryPool queryPool;
 
-    WorldProvider worldProvider;
+	WorldProvider worldProvider;
 
-    GLuint oqVao = 0;
-    GLuint oqTriangleBufferObject = 0;
-    GLuint oqTriangleIndicesBufferObject = 0;
-    Shader oqShader;
-    Shader worldShader;
-    float dayNightLightCoef;
+	GLuint oqVao = 0;
+	GLuint oqTriangleBufferObject = 0;
+	GLuint oqTriangleIndicesBufferObject = 0;
+	Shader oqShader;
+	Shader worldShader;
+	float dayNightLightCoef;
 
-    void create();
-    void render(const Camera &camera);
-    float getMaxLightNearPoint(const math::vec3 &v);
-
-    template<LightType lt>
-    float getMaxLightAtPoint(const math::vec3 &v);
-
-    CubeType getCubeAt(const math::ivec3 &v);
-
-    template<LightType lt>
-    LightValue *getLightRef(const math::ivec3 &v);
+	void create();
+	void render(const Camera &camera, const cyberCubes::Player &player);
+	float getMaxLightNearPoint(const math::vec3 &v);
 
 	template<LightType lt>
-    void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
-    bool getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math::ivec3 &result, math::ivec3 &prev);
-    void move(math::BBox &box, const math::vec3 &delta);
-    bool putBlock(const math::ivec3 &v, CubeType c);
+	float getMaxLightAtPoint(const math::vec3 &v);
+
+	CubeType getCubeAt(const math::ivec3 &v);
+
+	template<LightType lt>
+	LightValue *getLightRef(const math::ivec3 &v);
+
+	template<LightType lt>
+	void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
+	bool getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math::ivec3 &result, math::ivec3 &prev);
+	void move(math::BBox &box, const math::vec3 &delta);
+	bool putBlock(const math::ivec3 &v, CubeType c);
+
+	bool isChunkCoordValid(const IntCoord &p) const;
+	
+	
+private:
+	IntCoord minWorldChunkCoord, maxWorldChunkCoord;
+	
+	void _loadChunks();
+	void _lightChunks();
+	void _unloadUnusedChunks();
+	
+	struct ChunkLoadRequest
+	{
+		IntCoord chunkCoord;
+		Chunk *chunk;
+	};
+	
+	struct ChunkLightUpRequest
+	{
+		IntCoord chunkCoord;
+		bool isSunLight;
+		Chunk *chunk;
+	};
+	
+	cyberCubes::BlockingQueue<ChunkLoadRequest> _pendingChunkCoords;
+	std::unique_ptr<std::thread> _loadChunksThread;
+	std::atomic_flag _isLoadingThreadRunned;
+	
+	cyberCubes::BlockingQueue<ChunkLightUpRequest> _lightingChunkCoords;
+	std::unique_ptr<std::thread> _lightingChunksThread;
+	std::atomic_flag _isLightingThreadRunned;
+	
+	
+	Chunk *getLoadedChunk(const IntCoord &coord);
+	Chunk *getChunk(const IntCoord &coord);
+	
+	void _linkChunk(Chunk *chunk, const IntCoord &pos);
+	void _unlinkChunk(const IntCoord &pos);
+	size_t _getTotalRenderDataMemoryUse() const;
+	void releaseOldRenderData();
+	bool isChunkCanBeRendered(const IntCoord &coord) const;
+	
+	Tick _renderTick;
+	size_t _maxRenderDataMemoryUse;
+	size_t _maxChunksMemoryUse;
 };
 
 #endif // WORLD_H

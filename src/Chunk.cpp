@@ -5,11 +5,23 @@
 #include <boost/timer/timer.hpp>
 #include <cassert>
 
-Chunk::Chunk()
+bool SunLightPropagationLayer::hasZeros() const
+{
+	for (int i = 0; i < CHUNK_SIZE*CHUNK_SIZE; ++i)
+	{
+		if (!numBlocks[i])
+			return true;
+	}
+	
+	return false;
+}
+
+Chunk::Chunk() : isLoaded(false), isLighted(false), isSunLighted(false)
 {
     memset(cubes, 0, sizeof(cubes));
     memset(light, 0, sizeof(light));
-    u = d = l = r = f = b = NULL;
+    u = d = l = r = f = b = nullptr;
+    touchTick = 0;
 }
 
 void Chunk::put(const math::ivec3 &p, int type)
@@ -64,6 +76,23 @@ int Chunk::getSunLight(int x, int y) const
 	}
 
 	return u->getSunLight(x, y);
+}
+
+void Chunk::computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const
+{
+	for (int x = 0; x < CHUNK_SIZE; ++x)
+	{
+		for (int y = 0; y < CHUNK_SIZE; ++y)
+		{
+			int num = 0;
+			for (int z = 0; z < CHUNK_SIZE; ++z)
+			{
+				if (cubeAt(math::ivec3(x, y, z)) > 0)
+					++num;
+			}
+			layer.valueAt(x, y) = num;
+		}	
+	}
 }
 
 void Chunk::updateLight()

@@ -8,12 +8,12 @@ struct Block
 {
 	Block();
 
-    int id;
-    std::string name;
+	int id;
+	std::string name;
 	std::string mainTexture;
 	bool opaque;
 	int lightOpacity;
-	int lightValue;
+	int lightValueSun, lightValueR, lightValueG, lightValueB;
 	float hardness;
 
 	void registerBlock();

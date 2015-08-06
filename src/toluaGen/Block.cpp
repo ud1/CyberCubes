@@ -1,6 +1,6 @@
 /*
 ** Lua binding: Block
-** Generated automatically by tolua++-1.0.93 on Sat Oct 25 11:33:23 2014.
+** Generated automatically by tolua++-1.0.93 on Tue Aug  4 21:47:44 2015.
 */
 
 #ifndef __cplusplus
@@ -240,31 +240,121 @@ static int tolua_set_Block_lightOpacity(lua_State* tolua_S)
 }
 #endif //#ifndef TOLUA_DISABLE
 
-/* get function: lightValue of class  Block */
-#ifndef TOLUA_DISABLE_tolua_get_Block_lightValue
-static int tolua_get_Block_lightValue(lua_State* tolua_S)
+/* get function: lightValueSun of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_lightValueSun
+static int tolua_get_Block_lightValueSun(lua_State* tolua_S)
 {
   Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
 #ifndef TOLUA_RELEASE
-  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValue'",NULL);
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueSun'",NULL);
 #endif
-  tolua_pushnumber(tolua_S,(lua_Number)self->lightValue);
+  tolua_pushnumber(tolua_S,(lua_Number)self->lightValueSun);
  return 1;
 }
 #endif //#ifndef TOLUA_DISABLE
 
-/* set function: lightValue of class  Block */
-#ifndef TOLUA_DISABLE_tolua_set_Block_lightValue
-static int tolua_set_Block_lightValue(lua_State* tolua_S)
+/* set function: lightValueSun of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_lightValueSun
+static int tolua_set_Block_lightValueSun(lua_State* tolua_S)
 {
   Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
 #ifndef TOLUA_RELEASE
   tolua_Error tolua_err;
-  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValue'",NULL);
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueSun'",NULL);
   if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
    tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
 #endif
-  self->lightValue = ((int)  tolua_tonumber(tolua_S,2,0))
+  self->lightValueSun = ((int)  tolua_tonumber(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: lightValueR of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_lightValueR
+static int tolua_get_Block_lightValueR(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueR'",NULL);
+#endif
+  tolua_pushnumber(tolua_S,(lua_Number)self->lightValueR);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: lightValueR of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_lightValueR
+static int tolua_set_Block_lightValueR(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueR'",NULL);
+  if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->lightValueR = ((int)  tolua_tonumber(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: lightValueG of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_lightValueG
+static int tolua_get_Block_lightValueG(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueG'",NULL);
+#endif
+  tolua_pushnumber(tolua_S,(lua_Number)self->lightValueG);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: lightValueG of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_lightValueG
+static int tolua_set_Block_lightValueG(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueG'",NULL);
+  if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->lightValueG = ((int)  tolua_tonumber(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: lightValueB of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_lightValueB
+static int tolua_get_Block_lightValueB(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueB'",NULL);
+#endif
+  tolua_pushnumber(tolua_S,(lua_Number)self->lightValueB);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: lightValueB of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_lightValueB
+static int tolua_set_Block_lightValueB(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'lightValueB'",NULL);
+  if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->lightValueB = ((int)  tolua_tonumber(tolua_S,2,0))
 ;
  return 0;
 }
@@ -408,7 +498,10 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
    tolua_variable(tolua_S,"mainTexture",tolua_get_Block_mainTexture,tolua_set_Block_mainTexture);
    tolua_variable(tolua_S,"opaque",tolua_get_Block_opaque,tolua_set_Block_opaque);
    tolua_variable(tolua_S,"lightOpacity",tolua_get_Block_lightOpacity,tolua_set_Block_lightOpacity);
-   tolua_variable(tolua_S,"lightValue",tolua_get_Block_lightValue,tolua_set_Block_lightValue);
+   tolua_variable(tolua_S,"lightValueSun",tolua_get_Block_lightValueSun,tolua_set_Block_lightValueSun);
+   tolua_variable(tolua_S,"lightValueR",tolua_get_Block_lightValueR,tolua_set_Block_lightValueR);
+   tolua_variable(tolua_S,"lightValueG",tolua_get_Block_lightValueG,tolua_set_Block_lightValueG);
+   tolua_variable(tolua_S,"lightValueB",tolua_get_Block_lightValueB,tolua_set_Block_lightValueB);
    tolua_variable(tolua_S,"hardness",tolua_get_Block_hardness,tolua_set_Block_hardness);
    tolua_function(tolua_S,"registerBlock",tolua_Block_Block_registerBlock00);
    tolua_function(tolua_S,"get",tolua_Block_Block_get00);

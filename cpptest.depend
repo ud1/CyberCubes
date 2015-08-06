@@ -1,0 +1,162 @@
+# depslib dependency file v1.0
+1424634482 source:/home/denis/cppworkspace/cpptest/main.cpp
+	<GL/glew.h>
+	<SDL2/SDL.h>
+	<SDL2/SDL_image.h>
+	<iostream>
+	"Camera.h"
+	<set>
+	<boost/timer/timer.hpp>
+	<cmath>
+	<boost/scoped_ptr.hpp>
+	"Chunk.h"
+	"Atlas.h"
+	"RenderData.h"
+	"World.h"
+	"Frustum.h"
+	"Shader.h"
+	"colorTransform.h"
+	<lua.h>
+	<lualib.h>
+	<tolua.h>
+
+1415034436 source:/home/denis/cppworkspace/cpptest/src/Camera.cpp
+	"Camera.h"
+	<glm/ext.hpp>
+	<iostream>
+
+1415025422 /home/denis/cppworkspace/cpptest/include/Camera.h
+	<Math.h>
+	<ostream>
+
+1424550785 /home/denis/cppworkspace/cpptest/include/Chunk.h
+	"Math.h"
+	<stdint.h>
+
+1424001070 /home/denis/cppworkspace/cpptest/include/Math.h
+	<glm/glm.hpp>
+	<glm/gtc/quaternion.hpp>
+
+1424545894 source:/home/denis/cppworkspace/cpptest/src/Chunk.cpp
+	"Chunk.h"
+	<cstring>
+	<cmath>
+	<algorithm>
+	<boost/timer/timer.hpp>
+	<cassert>
+
+1410002095 /home/denis/cppworkspace/cpptest/include/Atlas.h
+
+1410002055 source:/home/denis/cppworkspace/cpptest/src/Atlas.cpp
+	"Atlas.h"
+
+1424547411 /home/denis/cppworkspace/cpptest/include/RenderData.h
+	<GL/glew.h>
+	<vector>
+	<map>
+	<boost/tuple/tuple.hpp>
+	<boost/tuple/tuple_comparison.hpp>
+	<stdint.h>
+	"Math.h"
+	"Chunk.h"
+
+1424593789 source:/home/denis/cppworkspace/cpptest/src/RenderData.cpp
+	<iostream>
+	"RenderData.h"
+	"colorTransform.h"
+
+1415481800 source:/home/denis/cppworkspace/cpptest/src/Frustum.cpp
+	"Frustum.h"
+	<iostream>
+
+1415005329 /home/denis/cppworkspace/cpptest/include/Frustum.h
+	"Math.h"
+
+1424557588 source:/home/denis/cppworkspace/cpptest/src/World.cpp
+	"World.h"
+	"Chunk.h"
+	"RenderData.h"
+	"Frustum.h"
+	<iostream>
+	<map>
+	<unordered_set>
+	<set>
+	<vector>
+	<cmath>
+	<libnoise/noise.h>
+	<boost/timer/timer.hpp>
+
+1424291405 /home/denis/cppworkspace/cpptest/include/World.h
+	<map>
+	<memory>
+	<boost/tuple/tuple.hpp>
+	<boost/tuple/tuple_comparison.hpp>
+	<GL/glew.h>
+	<vector>
+	"Math.h"
+	"Frustum.h"
+	"Shader.h"
+	"Camera.h"
+	"WorldProvider.h"
+
+1410109314 /home/denis/cppworkspace/cpptest/include/Shader.h
+	<map>
+	<string>
+	<GL/glew.h>
+
+1413632469 source:/home/denis/cppworkspace/cpptest/src/Shader.cpp
+	"Shader.h"
+	<iostream>
+
+1414225376 source:/home/denis/cppworkspace/cpptest/src/Block.cpp
+	"Block.h"
+	<unordered_map>
+	<iostream>
+
+1414222184 /home/denis/cppworkspace/cpptest/include/Block.h
+	<string>
+
+1414222403 source:/home/denis/cppworkspace/cpptest/src/toluaGen/Block.cpp
+	"stdlib.h"
+	"string.h"
+	"tolua++.h"
+	"Block.h"
+
+1326486980 /usr/include/lua5.1//lua.h
+	<stdarg.h>
+	<stddef.h>
+	"luaconf.h"
+
+1409677666 /usr/include/lua5.1//luaconf.h
+	<limits.h>
+	<stddef.h>
+	"lua5.1-deb-multiarch.h"
+	<unistd.h>
+	<io.h>
+	<stdio.h>
+	<stdio.h>
+	<readline/readline.h>
+	<readline/history.h>
+	<assert.h>
+	<math.h>
+	<unistd.h>
+
+1198760545 /usr/include/lua5.1//lualib.h
+	"lua.h"
+
+1414830598 /home/denis/cppworkspace/cpptest/include/WorldProvider.h
+	"Chunk.h"
+	"Math.h"
+
+1424199085 source:/home/denis/cppworkspace/cpptest/src/WorldProvider.cpp
+	"WorldProvider.h"
+	<fstream>
+	<sstream>
+	<string>
+
+1424292891 source:/home/denis/cppworkspace/cpptest/src/colorTransform.cpp
+	"colorTransform.h"
+	<cmath>
+
+1424292768 /home/denis/cppworkspace/cpptest/include/colorTransform.h
+
