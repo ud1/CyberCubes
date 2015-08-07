@@ -611,7 +611,7 @@ bool World::putBlock(const math::ivec3 &v, CubeType c)
 		return false;
 
 	math::ivec3 bp = eucModChunk(v);
-	chunk->cubes[((bp.x * CHUNK_SIZE) + bp.y) * CHUNK_SIZE + bp.z] = c;
+	chunk->put(bp, c);
 	chunk->isDirty = true;
 
 	/*if (chuckC.x > 1)
@@ -1021,7 +1021,7 @@ bool World::isChunkCanBeRendered(const IntCoord &coord) const
 	ChunkMap::const_iterator it;
 	
 	it = chunks.find(coord);
-	if (it == chunks.end() || !it->second->isLighted.load())
+	if (it == chunks.end() || !it->second->isLighted.load() || !it->second->blockCount)
 		return false;
 	
 	for (int x = -1; x <= 1 ; ++x)

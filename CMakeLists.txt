@@ -28,5 +28,5 @@ include_directories(include ${LUA_INCLUDE_DIR})
 install(TARGETS cubercubes RUNTIME DESTINATION bin)
 
 target_link_libraries(cubercubes
-    GL GLEW SDL2 SDL2_image boost_system boost_timer noise ${LUA_LIBRARIES} tolua++5.1
+    GL GLEW SDL2 SDL2_image boost_system boost_timer noise ${LUA_LIBRARIES} tolua++5.1 z
 )

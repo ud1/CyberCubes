@@ -5,6 +5,8 @@
 #include <sstream>
 #include <string>
 #include <libnoise/noise.h>
+#include <zlib.h>
+#include <vector>
 
 namespace
 {
@@ -43,39 +45,63 @@ bool WorldProvider::save(const Chunk &chunk, const math::ivec3 &pos, bool rewrit
 
 	if (!rewrite)
 	{
-		std::ifstream file(getFileName(pos), std::ios::binary);
+		std::ifstream file(fileName, std::ios::binary);
 
 		if (file)
 			return false;
 	}
 
-	std::ofstream file(getFileName(pos), std::ios::binary);
+	std::ofstream file(fileName, std::ios::binary);
 
-	file.write((char *) chunk.cubes, sizeof(chunk.cubes));
-	//file.write((char *) chunk.light, sizeof(chunk.light));
+	if (!file)
+		return false;
+	
+	uLongf outputSize = compressBound(sizeof(chunk.cubes));
+	std::vector<Bytef> buffer;
+	buffer.resize(outputSize);
+	
+	int resultCode = compress2(buffer.data(), &outputSize, reinterpret_cast<const Bytef *>(chunk.cubes), sizeof(chunk.cubes), 3);
+	bool result = resultCode == Z_OK;
+	
+	file.write((char *) buffer.data(), outputSize);
 
-	return true;
+	//std::cout << "Save " << fileName << " " << (result ? "OK" : "FAIL") << std::endl;
+	return result;
 }
 
 bool WorldProvider::load(Chunk &chunk, const math::ivec3 &pos)
 {
-	std::ifstream file(getFileName(pos), std::ios::binary);
+	std::string fileName = getFileName(pos);
+	std::ifstream file(fileName, std::ios::binary);
 
 	if (!file)
 		return false;
 
-	file.read((char *) chunk.cubes, sizeof(chunk.cubes));
-	//file.read((char *) chunk.light, sizeof(chunk.light));
-
-	std::cout << "Load OK " << getFileName(pos) << std::endl;
-	return true;
+	file.seekg(0, std::ios_base::end);
+	size_t fileSize = file.tellg();
+	
+	if (!fileSize)
+		return false;
+	
+	file.seekg(0, std::ios_base::beg);
+	
+	std::vector<Bytef> buffer;
+	buffer.resize(fileSize);
+	file.read((char *) buffer.data(), fileSize);
+	
+	uLongf destLen = sizeof(chunk.cubes);
+	int resultCode = uncompress(reinterpret_cast<Bytef *>(chunk.cubes), &destLen, buffer.data(), fileSize);
+	bool result = resultCode == Z_OK && destLen == sizeof(chunk.cubes);
+	
+	//std::cout << "Load " << fileName << " " << (result ? "OK" : "FAIL") << std::endl;
+	return result;
 }
 
 void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 {
-	
+
 	if (!load(chunk, chunkCoord))
-	{	
+	{
 		GradientModule gradientModule;
 		noise::module::Turbulence turbulence;
 		turbulence.SetSourceModule(0, gradientModule);
@@ -90,14 +116,15 @@ void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 				{
 					math::ivec3 p(x, y, z);
 					math::vec3 pos = i2f(chunkCoord * CHUNK_SIZE_I + p);
+
 					if (pos.z > 256)
 						continue;
 
 					double v = turbulence.GetValue(pos.x, pos.y, pos.z);
 
 					if ((v < 1.0 || v > 1.8) && (v < 2.5 || v > 3.0) && (v < 5.0 || v > 5.2) && (v < 7.0 || v > 7.2)
-						&& (v < 9.0 || v > 9.5) && (v < 12.0 || v > 12.3)
-					)
+							&& (v < 9.0 || v > 9.5) && (v < 12.0 || v > 12.3)
+					   )
 					{
 						int type = ((float) rand() / (float) RAND_MAX > (pos.z / 200.0)) ? 1 : 2;
 
@@ -113,7 +140,8 @@ void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 			}
 		}
 	}
-	
+
+	chunk.recalcBlockCount();
 	chunk.isLoaded.store(true);
 }
 

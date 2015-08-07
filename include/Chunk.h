@@ -125,6 +125,7 @@ struct Chunk
 	Chunk *u, *d, *l, *r, *b, *f;
 	bool isDummy = false;
 	bool isDirty = false;
+	unsigned blockCount;
 	
 	std::atomic_bool isLoaded, isLighted, isSunLighted;
 	Tick touchTick;
@@ -163,6 +164,8 @@ struct Chunk
 	int getSunLight(int x, int y) const;
 	
 	void computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const;
+	
+	void recalcBlockCount();
 };
 
 template<LightType lt>
