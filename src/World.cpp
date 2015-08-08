@@ -18,7 +18,7 @@
 #include <thread>
 
 const int S = 4;
-const int SZ = 9;
+const int SZ = 16;
 
 //std::ofstream lout("lout.txt", std::ofstream::out | std::ofstream::trunc);
 
@@ -27,11 +27,11 @@ void checkGLError(const char *str);
 World::World()
 {
 	_renderTick = 0;
-	_maxRenderDataMemoryUse = 100 * 1024 * 1024;
-	_maxChunksMemoryUse = 400 * 1024 * 1024;
+	_maxRenderDataMemoryUse = 500 * 1024 * 1024;
+	_maxChunksMemoryUse = 2000 * 1024 * 1024;
 	
 	constexpr int W = 100000;
-	minWorldChunkCoord = IntCoord(-W, -W, 0);
+	minWorldChunkCoord = IntCoord(-W, -W, -W);
 	maxWorldChunkCoord = IntCoord(W, W, SZ);
 	
 	_isLoadingThreadRunned.test_and_set();
@@ -39,6 +39,9 @@ World::World()
 	
 	_isLightingThreadRunned.test_and_set();
 	_lightingChunksThread.reset(new std::thread(&World::_lightChunks, this));
+	
+	_isLoadSLLayerThreadRunned.test_and_set();
+	_loadSLLayerThread.reset(new std::thread(&World::_loadSLLayers, this));
 }
 
 World::~World()
@@ -49,12 +52,17 @@ World::~World()
 	_isLightingThreadRunned.clear();
 	_lightingChunkCoords.push(ChunkLightUpRequest());
 	
+	_isLoadSLLayerThreadRunned.clear();
+	_slLayerCoords.push(SLLayerLoadRequest());
+	
 	_loadChunksThread->join();
 	_lightingChunksThread->join();
+	_loadSLLayerThread->join();
 	
 	for (ChunkMap::const_iterator it = chunks.begin(); it != chunks.end(); ++it)
 	{
 		worldProvider.save(*it->second.get(), it->first, true);
+		worldProvider.save(sunLightPropagationLayerMap[it->first], it->first);
 	}
 }
 
@@ -80,35 +88,130 @@ void World::_loadChunks()
 	_isLoadingThreadRunned.clear();
 }
 
-void updateBlockLightVector(Chunk *chunk, const math::ivec3 &p, const math::ivec3 &chunkPos,
-			    std::vector<AddedBlockLight> &addedBlocks)
+void World::_loadSLLayers()
 {
-	CubeType cube = chunk->cubeAt(p);
-
-	if (cube)
+	while(true)
 	{
-		const Block *block = Block::get(cube);
-
-		if (block->lightValueR)
-			chunk->rawLightRefAt<LIGHT_R>(p) = block->lightValueR;
-		if (block->lightValueG)
-			chunk->rawLightRefAt<LIGHT_G>(p) = block->lightValueG;
-		if (block->lightValueB)
-			chunk->rawLightRefAt<LIGHT_B>(p) = block->lightValueB;
-	}
-	
-	if (chunk->rawLightRefAt<LIGHT_R>(p) > 0 || chunk->rawLightRefAt<LIGHT_G>(p) > 0 || chunk->rawLightRefAt<LIGHT_B>(p) > 0)
-	{
-		AddedBlockLight lb;
-		lb.position = p + chunkPos;
-		lb.lightColor[LIGHT_R] = chunk->rawLightRefAt<LIGHT_R>(p);
-		lb.lightColor[LIGHT_G] = chunk->rawLightRefAt<LIGHT_G>(p);
-		lb.lightColor[LIGHT_B] = chunk->rawLightRefAt<LIGHT_B>(p);
-		addedBlocks.push_back(lb);
+		SLLayerLoadRequest request = _slLayerCoords.pop();
 		
-		//lout << "UBLV " << lb.position.x << " " << lb.position.y << " " << lb.position.z << " " << (int) lb.lightColor[LIGHT_R] << " " << (int) lb.lightColor[LIGHT_G] << " " << (int) lb.lightColor[LIGHT_B] << std::endl;
+		if (!_isLoadSLLayerThreadRunned.test_and_set())
+			break;
+		
+		bool res = worldProvider.load(*request.layer, request.chunkCoord);
+		
+		if (res)
+			request.layer->isLoaded.store(true);
+		else
+			request.layer->isCannotBeLoaded.store(true);
+	}
+	_isLoadSLLayerThreadRunned.clear();
+}
+
+void updateBlockLightVector(Chunk *chunk, const math::ivec3 &p, const math::ivec3 &chunkPos,
+			    std::vector<AddedBlockLight> &addedBlocks, bool sun)
+{
+	if (sun)
+	{
+		if (chunk->rawLightRefAt<LIGHT_SUN>(p) > 0)
+		{
+			AddedBlockLight lb;
+			lb.position = p + chunkPos;
+			lb.lightColor[LIGHT_SUN] = chunk->rawLightRefAt<LIGHT_SUN>(p);
+			addedBlocks.push_back(lb);
+		}
+	}
+	else
+	{
+		CubeType cube = chunk->cubeAt(p);
+
+		if (cube)
+		{
+			const Block *block = Block::get(cube);
+
+			if (block->lightValueR)
+				chunk->rawLightRefAt<LIGHT_R>(p) = block->lightValueR;
+			if (block->lightValueG)
+				chunk->rawLightRefAt<LIGHT_G>(p) = block->lightValueG;
+			if (block->lightValueB)
+				chunk->rawLightRefAt<LIGHT_B>(p) = block->lightValueB;
+		}
+		
+		if (chunk->rawLightRefAt<LIGHT_R>(p) > 0 || chunk->rawLightRefAt<LIGHT_G>(p) > 0 || chunk->rawLightRefAt<LIGHT_B>(p) > 0)
+		{
+			AddedBlockLight lb;
+			lb.position = p + chunkPos;
+			lb.lightColor[LIGHT_R] = chunk->rawLightRefAt<LIGHT_R>(p);
+			lb.lightColor[LIGHT_G] = chunk->rawLightRefAt<LIGHT_G>(p);
+			lb.lightColor[LIGHT_B] = chunk->rawLightRefAt<LIGHT_B>(p);
+			addedBlocks.push_back(lb);
+		}
 	}
 }
+
+LightValue sunLightAt(int z)
+{
+	if (z < 0)
+		return 0;
+	if (z >= 256)
+		return MAX_LIGHT;
+	
+	return z / 8;
+}
+
+void adj(int i, math::ivec3 &p)
+{
+	switch (i)
+	{
+	case 0:
+		p.x--;
+		break;
+
+	case 1:
+		p.x++;
+		break;
+
+	case 2:
+		p.y--;
+		break;
+
+	case 3:
+		p.y++;
+		break;
+
+	case 4:
+		p.z--;
+		break;
+
+	case 5:
+		p.z++;
+		break;
+	}
+}
+
+struct ChunkPtrMapAccessor
+{
+	ChunkPtrMapAccessor(World::ChunkPtrMap &map) : map(map) {}
+	World::ChunkPtrMap &map;
+
+	template<LightType lt>
+	LightValue *getLightRef(const math::ivec3 &v)
+	{
+		return &getChunk(eucDivChunk(v))->rawLightRefAt<lt>(eucModChunk(v));
+	}
+
+	CubeType getCubeAt(const math::ivec3 &v)
+	{
+		return getChunk(eucDivChunk(v))->cubeAt(eucModChunk(v));
+	}
+
+	Chunk *getChunk(const IntCoord &coord)
+	{
+		return map[coord];
+	}
+};
+
+template<LightType lt, typename Accessor, bool updateDirtyFlags>
+void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks, Accessor &a);
 
 void World::_lightChunks()
 {
@@ -119,70 +222,190 @@ void World::_lightChunks()
 		if (!_isLightingThreadRunned.test_and_set())
 			break;
 		
+
 		std::vector<AddedBlockLight> addedBlocks;
 		std::vector<math::ivec3> removedBlocks;
-		
+
 		//lout << "REQS1 " << request.chunkCoord.x << " " << request.chunkCoord.y << " " << request.chunkCoord.z << std::endl;
-		
-		for (int x = 0; x < CHUNK_SIZE; ++x)
+
+		if (!request.isSunLight)
 		{
-			for (int y = 0; y < CHUNK_SIZE; ++y)
+			for (int x = 0; x < CHUNK_SIZE; ++x)
 			{
-				for (int z = 0; z < CHUNK_SIZE; ++z)
+				for (int y = 0; y < CHUNK_SIZE; ++y)
 				{
-					updateBlockLightVector(request.chunk, math::ivec3(x, y, z), request.chunkCoord * CHUNK_SIZE_I, addedBlocks);
-				}	
-			}	
+					for (int z = 0; z < CHUNK_SIZE; ++z)
+					{
+						updateBlockLightVector(request.chunk, math::ivec3(x, y, z), request.chunkCoord * CHUNK_SIZE_I, addedBlocks, false);
+					}
+				}
+			}
 		}
-		
+		else
+		{
+			SunLightPropagationSum *sum = request.sunLightPropagationSum.get();
+			Chunk *chunk = request.chunk;
+			IntCoord chunkPos = request.chunkCoord * CHUNK_SIZE_I;
+			for (int x = 0; x < CHUNK_SIZE; ++x)
+			{
+				for (int y = 0; y < CHUNK_SIZE; ++y)
+				{
+					int k = 0;
+					if (sum->valueAt(x, y) == 0)
+					{
+						for (int z = CHUNK_SIZE; z -- > 0;)
+						{
+							IntCoord p = IntCoord(x, y, z);
+							if (chunk->cubeAt(p) > 0)
+								break;
+							
+							LightValue lv = sunLightAt(z + chunkPos.z);
+							chunk->rawLightRefAt<LIGHT_SUN>(p) = lv;
+						}
+					}
+				}
+			}
+			
+			for (int x = 0; x < CHUNK_SIZE; ++x)
+			{
+				for (int y = 0; y < CHUNK_SIZE; ++y)
+				{
+					int k = 0;
+					if (sum->valueAt(x, y) == 0)
+					{
+						for (int z = CHUNK_SIZE; z -- > 0;)
+						{
+							IntCoord p = IntCoord(x, y, z);
+							if (chunk->cubeAt(p) > 0)
+								break;
+							
+							bool addLightSource = false;
+							if (x > 0 && x < CHUNK_SIZE_M1_I && y > 0 && y < CHUNK_SIZE_M1_I && z > 0 && z < CHUNK_SIZE_M1_I)
+							{
+								for (int i = 0; i < 6; ++i)
+								{
+									math::ivec3 adjP = p;
+									adj(i, adjP);
+									LightValue lv = sunLightAt(adjP.z + chunkPos.z);
+									LightValue bl = chunk->rawLightRefAt<LIGHT_SUN>(adjP);
+									if (lv != bl)
+									{
+										addLightSource = true;
+										break;
+									}
+								}
+							}
+							else
+							{
+								addLightSource = true;
+							}
+						
+							if (addLightSource)
+							{
+								LightValue lv = sunLightAt(z + chunkPos.z);
+								if (lv > 0)
+								{
+									AddedBlockLight lb;
+									lb.position = p + chunkPos;
+									lb.lightColor[LIGHT_SUN] = lv;
+									addedBlocks.push_back(lb);
+									++k;
+								}
+							}
+						}
+					}
+				}
+			}
+			//lout << "SL " << request.chunkCoord.x << " " << request.chunkCoord.y << " " << request.chunkCoord.z << std::endl;
+		}
+
 		//lout << "REQS2 " << request.chunkCoord.x << " " << request.chunkCoord.y << " " << request.chunkCoord.z << std::endl;
-		
+
 		for (int x = 0; x < CHUNK_SIZE; ++x)
 		{
 			for (int y = 0; y < CHUNK_SIZE; ++y)
 			{
 				math::ivec3 chunkPos = request.chunkCoord * CHUNK_SIZE_I;
 				chunkPos.z -= CHUNK_SIZE_I;
+
 				if (!request.chunk->d->isDummy)
-					updateBlockLightVector(request.chunk->d, math::ivec3(x, y, CHUNK_SIZE_I - 1), chunkPos, addedBlocks);
-				
+					updateBlockLightVector(request.chunk->d, math::ivec3(x, y, CHUNK_SIZE_I - 1), chunkPos, addedBlocks, request.isSunLight);
+
 				chunkPos.z += 2 * CHUNK_SIZE_I;
+
 				if (!request.chunk->u->isDummy)
-					updateBlockLightVector(request.chunk->u, math::ivec3(x, y, 0), chunkPos, addedBlocks);
-				
+					updateBlockLightVector(request.chunk->u, math::ivec3(x, y, 0), chunkPos, addedBlocks, request.isSunLight);
+
 				chunkPos = request.chunkCoord * CHUNK_SIZE_I;
 				chunkPos.x -= CHUNK_SIZE_I;
+
 				if (!request.chunk->l->isDummy)
-					updateBlockLightVector(request.chunk->l, math::ivec3(CHUNK_SIZE_I - 1, x, y), chunkPos, addedBlocks);
-				
+					updateBlockLightVector(request.chunk->l, math::ivec3(CHUNK_SIZE_I - 1, x, y), chunkPos, addedBlocks, request.isSunLight);
+
 				chunkPos.x += 2 * CHUNK_SIZE_I;
+
 				if (!request.chunk->r->isDummy)
-					updateBlockLightVector(request.chunk->r, math::ivec3(0, x, y), chunkPos, addedBlocks);
-				
-				
+					updateBlockLightVector(request.chunk->r, math::ivec3(0, x, y), chunkPos, addedBlocks, request.isSunLight);
+
+
 				chunkPos = request.chunkCoord * CHUNK_SIZE_I;
 				chunkPos.y -= CHUNK_SIZE_I;
+
 				if (!request.chunk->b->isDummy)
-					updateBlockLightVector(request.chunk->b, math::ivec3(x, CHUNK_SIZE_I - 1, y), chunkPos, addedBlocks);
-				
+					updateBlockLightVector(request.chunk->b, math::ivec3(x, CHUNK_SIZE_I - 1, y), chunkPos, addedBlocks, request.isSunLight);
+
 				chunkPos.y += 2 * CHUNK_SIZE_I;
+
 				if (!request.chunk->f->isDummy)
-					updateBlockLightVector(request.chunk->f, math::ivec3(x, 0, y), chunkPos, addedBlocks);
+					updateBlockLightVector(request.chunk->f, math::ivec3(x, 0, y), chunkPos, addedBlocks, request.isSunLight);
+			}
+		}
+
+		//lout << "UPD " << request.chunkCoord.x << " " << request.chunkCoord.y << " " << request.chunkCoord.z << std::endl;
+
+		if (!addedBlocks.empty())
+		{
+			ChunkPtrMapAccessor accessor(request.chunkPtrMap);
+			
+			if (request.isSunLight)
+			{
+				::updateLight<LIGHT_SUN, ChunkPtrMapAccessor, false>(addedBlocks, removedBlocks, accessor);
+			}
+			else
+			{
+				::updateLight<LIGHT_R, ChunkPtrMapAccessor, false>(addedBlocks, removedBlocks, accessor);
+				::updateLight<LIGHT_G, ChunkPtrMapAccessor, false>(addedBlocks, removedBlocks, accessor);
+				::updateLight<LIGHT_B, ChunkPtrMapAccessor, false>(addedBlocks, removedBlocks, accessor);
 			}
 		}
 		
-		//lout << "UPD " << request.chunkCoord.x << " " << request.chunkCoord.y << " " << request.chunkCoord.z << std::endl;
-		
-		if (!addedBlocks.empty())
+		for (int x = -1; x <= 1; ++x)
 		{
-			updateLight<LIGHT_R>(addedBlocks, removedBlocks);
-			updateLight<LIGHT_G>(addedBlocks, removedBlocks);
-			updateLight<LIGHT_B>(addedBlocks, removedBlocks);
+			for (int y = -1; y <= 1; ++y)
+			{
+				for (int z = -1; z <= 1; ++z)
+				{
+					IntCoord p = request.chunkCoord + IntCoord(x, y, z);
+					if (!request.chunkPtrMap[p]->isDummy)
+					{
+						request.chunkPtrMap[p]->isDirty = true;
+					}
+				}	
+			}	
 		}
 		
+		if (request.isSunLight)
+		{
+			request.chunk->isSunLighted.store(true);
+		}
+		else
+		{
+			request.chunk->isLighted.store(true);
+		}
+
 		//lout << "REQF " << request.chunkCoord.x << " " << request.chunkCoord.y << " " << request.chunkCoord.z << std::endl;
 		
-		request.chunk->isLighted.store(true);
+		
 		//std::this_thread::sleep_for(std::chrono::milliseconds(20));
 		
 	}
@@ -211,9 +434,14 @@ void World::_unloadUnusedChunks()
 			if (it->first + 60 > _renderTick)
 				return;
 			
+			Chunk *ch = getChunk(it->second);
+			if (!ch->isLighted.load() || ch->sunLightRecalculating && !ch->isSunLighted.load())
+				continue;
+			
 			_unlinkChunk(it->second);
 			total -= sizeof(Chunk);
 			worldProvider.save(*chunks[it->second].get(), it->second, true);
+			worldProvider.save(sunLightPropagationLayerMap[it->second], it->second);
 			chunks.erase(it->second);
 		}
 	}
@@ -247,7 +475,7 @@ float World::getMaxLightAtPoint(const math::vec3 &v)
 {
 	math::ivec3 p = floorCoord(v);
 	
-	Chunk *chunk = getLoadedChunk(eucDivChunk(p));
+	Chunk *chunk = getChunk(eucDivChunk(p));
 	if (!chunk)
 		return lt == LIGHT_SUN ? 1.0 : 0.0;
 
@@ -275,22 +503,9 @@ Chunk *World::getChunk(const IntCoord &coord)
 	return result;
 }
 
-Chunk *World::getLoadedChunk(const IntCoord &coord)
-{
-	Chunk *result = getChunk(coord);
-	
-	if (!result)
-		return nullptr;
-
-	/*if (!result->isLoaded.load())
-		return nullptr;*/
-	
-	return result;
-}
-
 CubeType World::getCubeAt(const math::ivec3 &v)
 {
-	Chunk *chunk = getLoadedChunk(eucDivChunk(v));
+	Chunk *chunk = getChunk(eucDivChunk(v));
 	if (!chunk)
 		return 0;
 	
@@ -300,7 +515,7 @@ CubeType World::getCubeAt(const math::ivec3 &v)
 template<LightType lt>
 LightValue *World::getLightRef(const math::ivec3 &v)
 {
-	Chunk *chunk = getLoadedChunk(eucDivChunk(v));
+	Chunk *chunk = getChunk(eucDivChunk(v));
 	if (!chunk)
 		return nullptr;
 
@@ -315,36 +530,6 @@ template LightValue *World::getLightRef<LIGHT_B>(const math::ivec3 &v);
 math::ivec3 getChunkCoord(const math::ivec3 &p)
 {
 	return eucDivChunk(p);
-}
-
-void adj(int i, math::ivec3 &p)
-{
-	switch (i)
-	{
-	case 0:
-		p.x--;
-		break;
-
-	case 1:
-		p.x++;
-		break;
-
-	case 2:
-		p.y--;
-		break;
-
-	case 3:
-		p.y++;
-		break;
-
-	case 4:
-		p.z--;
-		break;
-
-	case 5:
-		p.z++;
-		break;
-	}
 }
 
 struct UpdateLightSets
@@ -367,8 +552,9 @@ struct UpdateLightSets
 
 //UpdateLightSets updateLightSets;
 
-template<LightType lt>
-void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks)
+
+template<LightType lt, typename Accessor, bool updateDirtyFlags>
+void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks, Accessor &a)
 {
 	int cnt = 0;
 	int cnt2 = 0;
@@ -382,7 +568,7 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 
 	for (const AddedBlockLight & l : addedBlocks)
 	{
-		LightValue *lp = getLightRef<lt>(l.position);
+		LightValue *lp = a.template getLightRef<lt>(l.position);
 
 		if (!lp)
 			continue;
@@ -400,7 +586,7 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 
 	for (const math::ivec3 & blockCoord : removedBlocks)
 	{
-		LightValue *lp = getLightRef<lt>(blockCoord);
+		LightValue *lp = a.template getLightRef<lt>(blockCoord);
 
 		if (lp && *lp > 0)
 		{
@@ -412,7 +598,7 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 	{
 		boost::timer::auto_cpu_timer t;
 
-		LightValue *lp = getLightRef<lt>(blockCoord);
+		LightValue *lp = a.template getLightRef<lt>(blockCoord);
 
 		if (!lp)
 			continue;
@@ -431,24 +617,28 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 				{
 					math::ivec3 adjP = p;
 					adj(i, adjP);
-					LightValue *l2 = getLightRef<lt>(adjP);
+					LightValue *l2 = a.template getLightRef<lt>(adjP);
 
 					if (l2 && *l2)
 					{
-						if (*l2 <= l && !getCubeAt(adjP))
+						if (*l2 <= l && !a.getCubeAt(adjP))
 						{
 							//lout << "DB " << adjP.x << " " << adjP.y << " " << adjP.z << " <-- " << (int) 0 << " | " << p.x << " " << p.y << " " << p.z << std::endl;
 							
 							blockSet2.push_back(adjP);
 							*l2 = 0;
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z - 1)));
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z + 1)));
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z - 1)));
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z + 1)));
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z - 1)));
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z + 1)));
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z - 1)));
-							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z + 1)));
+							
+							if (updateDirtyFlags)
+							{
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z - 1)));
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z + 1)));
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z - 1)));
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z + 1)));
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z - 1)));
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z + 1)));
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z - 1)));
+								updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z + 1)));
+							}
 							++cnt;
 						}
 						else
@@ -467,7 +657,7 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 
 	for (const AddedBlockLight & l : addedBlocks)
 	{
-		LightValue *lp = getLightRef<lt>(l.position);
+		LightValue *lp = a.template getLightRef<lt>(l.position);
 
 		if (!lp)
 			continue;
@@ -479,7 +669,7 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 
 	for (const math::ivec3 & blockCoord : removedBlocks)
 	{
-		LightValue *lp = getLightRef<lt>(blockCoord);
+		LightValue *lp = a.template getLightRef<lt>(blockCoord);
 
 		if (lp && *lp > 0)
 		{
@@ -498,7 +688,7 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 			math::ivec3 adjP = p;
 			adj(i, adjP);
 
-			LightValue *l2 = getLightRef<lt>(adjP);
+			LightValue *l2 = a.template getLightRef<lt>(adjP);
 
 			if (l2 && *l2 > 1)
 			{
@@ -517,7 +707,7 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 	{
 		for (const math::ivec3 & p : lightSources)
 		{
-			LightValue l1 = *getLightRef<lt>(p);
+			LightValue l1 = *a.template getLightRef<lt>(p);
 
 			if (l1-- > 1)
 			{
@@ -526,21 +716,24 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 					math::ivec3 adjP = p;
 					adj(i, adjP);
 
-					LightValue *l2 = getLightRef<lt>(adjP);
+					LightValue *l2 = a.template getLightRef<lt>(adjP);
 
-					if (l2 && *l2 < l1 && !getCubeAt(adjP))
+					if (l2 && *l2 < l1 && !a.getCubeAt(adjP))
 					{
 						//lout << "LS " << adjP.x << " " << adjP.y << " " << adjP.z << " <-- " << (int) l1 << " | " << p.x << " " << p.y << " " << p.z << std::endl;
 						
 						*l2 = l1;
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z - 1)));
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z + 1)));
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z - 1)));
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z + 1)));
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z - 1)));
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z + 1)));
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z - 1)));
-						updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z + 1)));
+						if (updateDirtyFlags)
+						{
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z - 1)));
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y - 1, adjP.z + 1)));
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z - 1)));
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x - 1, adjP.y + 1, adjP.z + 1)));
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z - 1)));
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y - 1, adjP.z + 1)));
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z - 1)));
+							updatedChunks.insert(getChunkCoord(math::ivec3(adjP.x + 1, adjP.y + 1, adjP.z + 1)));
+						}
 						lightSources2.insert(adjP);
 						++cnt;
 					}
@@ -554,14 +747,24 @@ void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const s
 
 	std::cout << "UpdB " << cnt << std::endl;
 
-	for (const math::ivec3 & p : updatedChunks)
+	if (updateDirtyFlags)
 	{
-		Chunk *chunk = getLoadedChunk(p);
-		if (!chunk)
-			continue;
+		for (const math::ivec3 & p : updatedChunks)
+		{
+			Chunk *chunk = a.getChunk(p);
+			if (!chunk)
+				continue;
 
-		chunk->isDirty = true;
+			chunk->isDirty = true;
+		}
 	}
+}
+
+template<LightType lt>
+void World::updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks)
+{
+	Accessor accessor(this);
+	::updateLight<lt, Accessor, true>(addedBlocks, removedBlocks, accessor);
 }
 
 template void World::updateLight<LIGHT_R>(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
@@ -606,26 +809,92 @@ bool World::putBlock(const math::ivec3 &v, CubeType c)
 {
 	math::ivec3 chuckC = getChunkCoord(v);
 	
-	Chunk *chunk = getLoadedChunk(chuckC);
-	if (!chunk)
+	if (!isChunkCanBeRendered(eucDivChunk(v), true))
 		return false;
 
+	Chunk *chunk = getChunk(chuckC);
 	math::ivec3 bp = eucModChunk(v);
+	
+	if (chunk->cubeAt(bp) == c)
+		return false;
+	
 	chunk->put(bp, c);
-	chunk->isDirty = true;
 
-	/*if (chuckC.x > 1)
-		chunks[boost::make_tuple(chuckC.x - 1, chuckC.y, chuckC.z)]->isDirty = true;
-	if (chuckC.x < S - 1)
-		chunks[boost::make_tuple(chuckC.x + 1, chuckC.y, chuckC.z)]->isDirty = true;
-	if (chuckC.y > 1)
-		chunks[boost::make_tuple(chuckC.x, chuckC.y - 1, chuckC.z)]->isDirty = true;
-	if (chuckC.y < S - 1)
-		chunks[boost::make_tuple(chuckC.x, chuckC.y + 1, chuckC.z)]->isDirty = true;
-	if (chuckC.z > 1)
-		chunks[boost::make_tuple(chuckC.x, chuckC.y, chuckC.z - 1)]->isDirty = true;
-	if (chuckC.z < SZ - 1)
-		chunks[boost::make_tuple(chuckC.x, chuckC.y, chuckC.z + 1)]->isDirty = true;*/
+	std::vector<AddedBlockLight> addedBlocks, addedSunLightBlocks;
+	std::vector<math::ivec3> removedBlocks, removedSunLightBlocks;
+	
+	if (c == 0)
+	{
+		removedBlocks.push_back(v);
+		
+		LightValue *pl = getLightRef<LIGHT_SUN>(IntCoord(v.x, v.y, v.z + 1));
+		LightValue lv = pl ? *pl : MAX_LIGHT;
+		LightValue sl = sunLightAt(v.z + 1);
+		
+		if (sl == lv)
+		{
+			for (int z = v.z; z >= 0; --z)
+			{
+				IntCoord p = IntCoord(v.x, v.y, z);
+				CubeType cube = getCubeAt(p);
+				if (cube > 0)
+					break;
+				
+				pl = getLightRef<LIGHT_SUN>(p);
+				if (!pl)
+					break;
+				
+				AddedBlockLight lb;
+				lb.position = p;
+				lb.lightColor[LIGHT_SUN] = sunLightAt(z);
+				addedSunLightBlocks.push_back(lb);
+			}
+		}
+		else
+		{
+			removedSunLightBlocks.push_back(v);
+		}
+	}
+	else
+	{
+		const Block *block = Block::get(c);
+		
+		AddedBlockLight lb;
+		lb.position = v;
+		lb.lightColor[LIGHT_R] = block->lightValueR;
+		lb.lightColor[LIGHT_G] = block->lightValueR;
+		lb.lightColor[LIGHT_B] = block->lightValueR;
+		lb.lightColor[LIGHT_SUN] = 0;
+		addedBlocks.push_back(lb);
+		addedSunLightBlocks.push_back(lb);
+		
+		for (int z = v.z - 1; z >= 0; --z)
+		{
+			IntCoord p = IntCoord(v.x, v.y, z);
+			CubeType cube = getCubeAt(p);
+
+			if (cube > 0)
+				break;
+
+			LightValue *pl = getLightRef<LIGHT_SUN>(p);
+
+			if (!pl)
+				break;
+			
+			if (*pl < sunLightAt(z))
+				break;
+
+			removedSunLightBlocks.push_back(p);
+		}
+	}
+	
+	updateLight<LIGHT_R>(addedBlocks, removedBlocks);
+	updateLight<LIGHT_G>(addedBlocks, removedBlocks);
+	updateLight<LIGHT_B>(addedBlocks, removedBlocks);
+	updateLight<LIGHT_SUN>(addedSunLightBlocks, removedSunLightBlocks);
+	
+	chunk->isDirty = true;
+	
 	return true;
 }
 
@@ -723,134 +992,6 @@ void World::create()
 			}
 		}
 	}
-
-	/*std::cout << "create data" << std::endl;
-
-	for (int i = 0; i < S; ++i)
-	{
-		for (int j = 0; j < S; ++j)
-		{
-			for (int k = 0; k < SZ; ++k)
-			{
-				chunks[IntCoord(i, j, k)].reset(new Chunk);
-				renderData[IntCoord(i, j, k)].reset(new RenderData);
-			}
-		}
-	}
-
-	std::cout << "Link data" << std::endl;
-
-	for (int i = 0; i < S; ++i)
-	{
-		for (int j = 0; j < S; ++j)
-		{
-			for (int k = 0; k < SZ; ++k)
-			{
-				Chunk &chunk = *chunks[IntCoord(i, j, k)];
-
-				chunk.l = (i == 0)       ? pSolidChunk : chunks[IntCoord(i - 1, j, k)].get();
-				chunk.r = (i == (S - 1)) ? pSolidChunk : chunks[IntCoord(i + 1, j, k)].get();
-
-				chunk.b = (j == 0)       ? pSolidChunk : chunks[IntCoord(i, j - 1, k)].get();
-				chunk.f = (j == (S - 1)) ? pSolidChunk : chunks[IntCoord(i, j + 1, k)].get();
-
-				chunk.d = (k == 0)       ? pSolidChunk : chunks[IntCoord(i, j, k - 1)].get();
-				chunk.u = (k == (SZ - 1)) ? pSolidChunk : chunks[IntCoord(i, j, k + 1)].get();
-
-				std::cout << i << " " << j << " " << k << " " << chunk.d->isDummy << std::endl;
-			}
-		}
-	}
-
-
-	std::cout << "Fill" << std::endl;
-
-	for (int i = 0; i < S; ++i)
-	{
-		for (int j = 0; j < S; ++j)
-		{
-			for (int k = 0; k < SZ; ++k)
-			{
-				Chunk &chunk = *chunks[IntCoord(i, j, k)];
-
-				if (worldProvider.load(chunk, math::ivec3(i, j, k)))
-					continue;
-
-				worldProvider.fill(chunk, math::ivec3(i, j, k));
-			}
-		}
-	}
-
-	std::cout << "updateSunLight" << std::endl;
-
-	for (int i = 0; i < S; ++i)
-	{
-		for (int j = 0; j < S; ++j)
-		{
-			for (int k = 0; k < SZ; ++k)
-			{
-				Chunk &chunk = *chunks[IntCoord(i, j, k)];
-				chunk.updateSunLight();
-				chunk.updateLight();
-			}
-		}
-	}
-
-	for (int l = 0; l < MAX_LIGHT; ++l)
-	{
-		std::cout << "updateLightIter " << l << std::endl;
-		int updCount = 0;
-
-		for (int i = 0; i < S; ++i)
-		{
-			for (int j = 0; j < S; ++j)
-			{
-				for (int k = 0; k < SZ; ++k)
-				{
-					Chunk &chunk = *chunks[IntCoord(i, j, k)];
-					updCount += chunk.updateSunLightIter();
-				}
-			}
-		}
-
-		if (!updCount)
-			break;
-	}
-
-	std::cout << "saveData" << std::endl;
-
-	for (int i = 0; i < S; ++i)
-	{
-		for (int j = 0; j < S; ++j)
-		{
-			for (int k = 0; k < SZ; ++k)
-			{
-				Chunk &chunk = *chunks[IntCoord(i, j, k)];
-				worldProvider.save(chunk, math::ivec3(i, j, k), false);
-			}
-		}
-	}
-
-	std::cout << "uploadData" << std::endl;
-	size_t videoMemUse = 0;
-
-	for (int i = 0; i < S; ++i)
-	{
-		for (int j = 0; j < S; ++j)
-		{
-			for (int k = 0; k < SZ; ++k)
-			{
-				Chunk &chunk = *chunks[IntCoord(i, j, k)];
-				RenderData &rd = *renderData[IntCoord(i, j, k)];
-				rd.addVertexData(chunk);
-				rd.uploadData();
-				videoMemUse += rd.getVideoMemUse();
-			}
-		}
-	}
-
-	std::cout << "videoMemUse " << videoMemUse << std::endl;
-*/
 	
 	/////////////////////////
 	if (oqVao == 0)
@@ -1011,17 +1152,18 @@ void World::_unlinkChunk(const IntCoord &pos)
 		ch->d = pSolidChunk;
 }
 
-bool World::isChunkCanBeRendered(const IntCoord &coord) const
+bool World::isChunkCanBeRendered(const IntCoord &coord, bool ignoreBlockCount) const
 {
-	//return chunks.count(coord);
-	
 	if (!isChunkCoordValid(coord))
 		return false;
 	
 	ChunkMap::const_iterator it;
 	
 	it = chunks.find(coord);
-	if (it == chunks.end() || !it->second->isLighted.load() || !it->second->blockCount)
+	if (it == chunks.end() || !it->second->isLighted.load() || !it->second->isSunLighted.load())
+		return false;
+	
+	if (!ignoreBlockCount && !it->second->blockCount)
 		return false;
 	
 	for (int x = -1; x <= 1 ; ++x)
@@ -1034,7 +1176,7 @@ bool World::isChunkCanBeRendered(const IntCoord &coord) const
 				{
 					IntCoord c = coord + IntCoord(x, y, z);
 					it = chunks.find(c);
-					if (isChunkCoordValid(c) && (it == chunks.end() || !it->second->isLighted.load()))
+					if (isChunkCoordValid(c) && (it == chunks.end() || !it->second->isLighted.load() || !it->second->isSunLighted.load()))
 						return false;
 				}
 			}
@@ -1046,6 +1188,19 @@ bool World::isChunkCanBeRendered(const IntCoord &coord) const
 
 int dirty1 = 0, dirty2 = 0;
 
+Chunk *World::makeChunkLoadRequest(const IntCoord &coord)
+{
+	Chunk *chunk = new Chunk;
+	pendingChunks[coord].reset(chunk);
+	ChunkLoadRequest request;
+	request.chunkCoord = coord;
+	request.chunk = chunk;
+	chunk->slpl = &sunLightPropagationLayerMap[coord];
+	_pendingChunkCoords.push(request);
+	
+	return chunk;
+}
+
 void World::render(const Camera &camera, const cyberCubes::Player &player)
 {
 	++_renderTick;
@@ -1056,9 +1211,19 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 
 	typedef std::multimap<float, IntCoord> VisibleChunksMap;
 	VisibleChunksMap visibleChunks;
-
+	
+	std::multimap<float, IntCoord> playerChunks;
 	for (IntCoord coord : player.getChunks())
 	{
+		math::vec3 d = i2f(coord)*CHUNK_SIZE_F + math::vec3(CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f) - player.getPosition();
+		float dist = math::length(d);
+		playerChunks.insert(std::make_pair(dist, coord));
+	}
+	
+	for (std::multimap<float, IntCoord>::iterator it = playerChunks.begin(); it != playerChunks.end(); ++it)
+	{
+		IntCoord coord = it->second;
+		
 		Chunk *chunk;
 
 		if (chunks.count(coord))
@@ -1069,34 +1234,81 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 		{
 			if (!pendingChunks.count(coord))
 			{
-				pendingChunks[coord].reset(chunk = new Chunk);
-				ChunkLoadRequest request;
-				request.chunkCoord = coord;
-				request.chunk = chunk;
-				_pendingChunkCoords.push(request);
+				chunk = makeChunkLoadRequest(coord);
 			}
 			else
 			{
 				chunk = pendingChunks[coord].get();
-
-				if (chunk->isLoaded.load())
-				{
-					chunks.emplace(std::make_pair(coord, std::move(pendingChunks[coord])));
-					pendingChunks.erase(coord);
-					_linkChunk(chunk, coord);
-					
-					ChunkLightUpRequest request;
-					request.chunkCoord = coord;
-					request.isSunLight = false;
-					request.chunk = chunk;
-					_lightingChunkCoords.push(request);
-				}
 			}
 		}
 		
 		chunk->touchTick = _renderTick;
 		
-		if (isChunkCanBeRendered(coord))
+		bool slplLoaded = true;
+		
+		if (coord.z >= 0)
+		{
+			for (int z = coord.z + 1; z < SZ; ++z)
+			{
+				IntCoord p = IntCoord(coord.x, coord.y, z);
+				if (sunLightPropagationLayerMap.count(p))
+				{
+					SunLightPropagationLayer &l = sunLightPropagationLayerMap[p];
+					if (l.isCannotBeLoaded.load() && !chunks.count(p) && !pendingChunks.count(p))
+					{
+						Chunk *ch = makeChunkLoadRequest(p);
+					}
+				}
+				else
+				{
+					SunLightPropagationLayer &l = sunLightPropagationLayerMap[p];
+					SLLayerLoadRequest request;
+					request.chunkCoord = p;
+					request.layer = &l;
+					_slLayerCoords.push(request);
+				}
+			}
+			
+			
+			for (int z = coord.z + 1; z < SZ; ++z)
+			{
+				IntCoord p = IntCoord(coord.x, coord.y, z);
+				SunLightPropagationLayer &l = sunLightPropagationLayerMap[p];
+				if (!l.isLoaded.load())
+				{
+					slplLoaded = false;
+					break;
+				}
+			}
+		}
+		
+		if (chunks.count(coord) && !chunk->isSunLighted.load() && slplLoaded && !chunk->sunLightRecalculating)
+		{
+			chunk->sunLightRecalculating = true;
+			
+			if (coord.z >= 0)
+			{
+				// TODO code dublication
+				ChunkLightUpRequest request;
+				request.chunkCoord = coord;
+				request.isSunLight = true;
+				request.chunk = chunk;
+				SunLightPropagationSum *sum = new SunLightPropagationSum;
+				request.sunLightPropagationSum.reset(sum);
+				_getCurrentChunks3x3x3Area(request.chunkPtrMap, coord);
+				
+				for (int z = coord.z + 1; z < SZ; ++z)
+					sum->add(sunLightPropagationLayerMap[IntCoord(coord.x, coord.y, z)]);
+				
+				_lightingChunkCoords.push(std::move(request));
+			}
+			else
+			{
+				chunk->isSunLighted.store(true);
+			}
+		}
+		
+		if (isChunkCanBeRendered(coord, false))
 		{
 			math::vec3 pos = i2f(coord) * CHUNK_SIZE_F - math::vec3(0.5f, 0.5f, 0.5f);
 			math::BBox bbox(pos, math::vec3(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
@@ -1108,6 +1320,31 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 				visibleChunks.insert(std::make_pair(dist2, coord));
 			}
 		}
+	}
+	
+	for (ChunkMap::iterator it = pendingChunks.begin(); it != pendingChunks.end();)
+	{
+		Chunk *chunk = it->second.get();
+
+		if (chunk->isLoaded.load())
+		{
+			IntCoord coord = it->first;
+			chunks.emplace(std::make_pair(coord, std::move(it->second)));
+			_linkChunk(chunk, coord);
+			
+			// TODO code dublication
+			ChunkLightUpRequest request;
+			request.chunkCoord = coord;
+			request.isSunLight = false;
+			request.chunk = chunk;
+			_getCurrentChunks3x3x3Area(request.chunkPtrMap, coord);
+			_lightingChunkCoords.push(std::move(request));
+			
+			it = pendingChunks.erase(it);
+			continue;
+		}
+		
+		++it;
 	}
 
 	std::vector<IntCoord> visibleChunksVector;
@@ -1229,7 +1466,7 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 	//std::cout << "triangles " << trisRendred << " OQ " << occluded  << "/" << visibleChunksVector.size() << " memUse: " << _getTotalRenderDataMemoryUse()/1024.0/1024.0 << " MB" << std::endl;
 	//std::cout << "Chunk Mem " << chunks.size()*sizeof(Chunk)/1024.0/1024.0 << " MB, " << pendingChunks.size()*sizeof(Chunk)/1024.0/1024.0 << " MB" << std::endl;
 	
-	std::cout << dirty1 << " " << dirty2 << std::endl;
+	//std::cout << dirty1 << " " << dirty2 << std::endl;
 	
 	releaseOldRenderData();
 	_unloadUnusedChunks();
@@ -1269,5 +1506,27 @@ void World::releaseOldRenderData()
 			total -= renderData[it->second]->getVideoMemUse();
 			renderData.erase(it->second);
 		}
+	}
+}
+
+void World::_getCurrentChunks3x3x3Area(ChunkPtrMap &m, const IntCoord &center)
+{
+	for (int x = -1; x <= 1; ++x)
+	{
+		for (int y = -1; y <= 1; ++y)
+		{
+			for (int z = -1; z <= 1; ++z)
+			{
+				IntCoord p = center + IntCoord(x, y, z);
+				if (chunks.count(p))
+				{
+					m[p] = chunks[p].get();
+				}
+				else
+				{
+					m[p] = solidChunk.get();
+				}
+			}	
+		}	
 	}
 }

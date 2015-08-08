@@ -25,6 +25,10 @@ public:
 		return chunks;
 	}
 	
+	const math::vec3 &getPosition() const
+	{
+		return position;
+	}
 private:
 	math::vec3 position;
 	ChunkPositionSet chunks;

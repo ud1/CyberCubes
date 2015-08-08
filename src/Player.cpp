@@ -21,7 +21,7 @@ void Player::updatePosition(const math::vec3 &position_)
 	
 	IntCoord p = eucDivChunk(floorCoord(position));
 	
-	constexpr int RAD = 5;
+	constexpr int RAD = 8;
 	for (int x = -RAD; x <= RAD; ++x)
 	{
 		for (int y = -RAD; y <= RAD; ++y)

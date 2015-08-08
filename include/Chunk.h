@@ -14,6 +14,7 @@ constexpr size_t CHUNK_SIZE = 1 << CHUNK_SIZE_LOG2;
 constexpr int CHUNK_SIZE_I = CHUNK_SIZE;
 constexpr float CHUNK_SIZE_F = CHUNK_SIZE;
 constexpr size_t CHUNK_SIZE_M1 = CHUNK_SIZE - 1;
+constexpr int CHUNK_SIZE_M1_I = CHUNK_SIZE_M1;
 
 enum LightType
 {
@@ -110,7 +111,11 @@ LightVal<lt> rawLightAt(const Chunk &ch, const math::ivec3 &p);
 
 struct SunLightPropagationLayer
 {
+	SunLightPropagationLayer();
+	
 	unsigned char numBlocks[CHUNK_SIZE*CHUNK_SIZE];
+	
+	std::atomic_bool isLoaded, isCannotBeLoaded;
 	
 	unsigned char &valueAt(int x, int y)
 	{
@@ -118,6 +123,19 @@ struct SunLightPropagationLayer
 	}
 	
 	bool hasZeros() const;
+};
+
+struct SunLightPropagationSum
+{
+	SunLightPropagationSum();
+	unsigned numBlocks[CHUNK_SIZE*CHUNK_SIZE];
+	
+	unsigned valueAt(int x, int y)
+	{
+		return numBlocks[(x * CHUNK_SIZE) + y];
+	}
+	
+	void add(const SunLightPropagationLayer &l);
 };
 
 struct Chunk
@@ -128,10 +146,13 @@ struct Chunk
 	unsigned blockCount;
 	
 	std::atomic_bool isLoaded, isLighted, isSunLighted;
+	bool sunLightRecalculating;
 	Tick touchTick;
 
 	CubeType cubes[CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
 	LightValue light[LIGHT_COUNT][CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
+	
+	SunLightPropagationLayer *slpl;
 
 	Chunk();
 

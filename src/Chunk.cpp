@@ -5,6 +5,11 @@
 #include <boost/timer/timer.hpp>
 #include <cassert>
 
+SunLightPropagationLayer::SunLightPropagationLayer() : isLoaded(false), isCannotBeLoaded(false)
+{
+	
+}
+
 bool SunLightPropagationLayer::hasZeros() const
 {
 	for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE; ++i)
@@ -16,6 +21,19 @@ bool SunLightPropagationLayer::hasZeros() const
 	return false;
 }
 
+SunLightPropagationSum::SunLightPropagationSum()
+{
+	memset(numBlocks, 0, sizeof(numBlocks));
+}
+
+void SunLightPropagationSum::add(const SunLightPropagationLayer &l)
+{
+	for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE; ++i)
+	{
+		numBlocks[i] += l.numBlocks[i];
+	}
+}
+
 Chunk::Chunk() : isLoaded(false), isLighted(false), isSunLighted(false)
 {
 	memset(cubes, 0, sizeof(cubes));
@@ -23,6 +41,8 @@ Chunk::Chunk() : isLoaded(false), isLighted(false), isSunLighted(false)
 	u = d = l = r = f = b = nullptr;
 	touchTick = 0;
 	blockCount = 0;
+	slpl = nullptr;
+	sunLightRecalculating = false;
 }
 
 void Chunk::put(const math::ivec3 &p, int type)
@@ -30,9 +50,17 @@ void Chunk::put(const math::ivec3 &p, int type)
 	CubeType &t = cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
 	
 	if (t == 0 && type > 0)
+	{
 		++blockCount;
+		if (slpl)
+			++slpl->valueAt(p.x, p.y);
+	}
 	else if (t > 0 && type == 0)
+	{
 		--blockCount;
+		if (slpl)
+			--slpl->valueAt(p.x, p.y);
+	}
 	
 	t = type;
 }
@@ -109,6 +137,7 @@ void Chunk::computeSunLightPropagationLayer(SunLightPropagationLayer &layer) con
 			layer.valueAt(x, y) = num;
 		}
 	}
+	layer.isLoaded.store(true);
 }
 
 void Chunk::updateLight()

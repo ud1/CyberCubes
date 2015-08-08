@@ -42,9 +42,11 @@ public:
 	
 	typedef std::unique_ptr<Chunk> PChunk;
 	typedef std::unique_ptr<RenderData> PRenderData;
+	typedef std::unique_ptr<SunLightPropagationSum> PSunLightPropagationSum;
 
 	PChunk solidChunk;
 
+	typedef std::unordered_map<IntCoord, Chunk *, IntCoordHasher> ChunkPtrMap;
 	typedef std::unordered_map<IntCoord, PChunk, IntCoordHasher> ChunkMap;
 	ChunkMap chunks, pendingChunks;
 	
@@ -92,6 +94,7 @@ private:
 	void _loadChunks();
 	void _lightChunks();
 	void _unloadUnusedChunks();
+	void _loadSLLayers();
 	
 	struct ChunkLoadRequest
 	{
@@ -104,6 +107,14 @@ private:
 		IntCoord chunkCoord;
 		bool isSunLight;
 		Chunk *chunk;
+		PSunLightPropagationSum sunLightPropagationSum;
+		ChunkPtrMap chunkPtrMap;
+	};
+	
+	struct SLLayerLoadRequest
+	{
+		IntCoord chunkCoord;
+		SunLightPropagationLayer *layer;
 	};
 	
 	cyberCubes::BlockingQueue<ChunkLoadRequest> _pendingChunkCoords;
@@ -114,19 +125,47 @@ private:
 	std::unique_ptr<std::thread> _lightingChunksThread;
 	std::atomic_flag _isLightingThreadRunned;
 	
+	cyberCubes::BlockingQueue<SLLayerLoadRequest> _slLayerCoords;
+	std::unique_ptr<std::thread> _loadSLLayerThread;
+	std::atomic_flag _isLoadSLLayerThreadRunned;
 	
-	Chunk *getLoadedChunk(const IntCoord &coord);
 	Chunk *getChunk(const IntCoord &coord);
 	
 	void _linkChunk(Chunk *chunk, const IntCoord &pos);
 	void _unlinkChunk(const IntCoord &pos);
 	size_t _getTotalRenderDataMemoryUse() const;
 	void releaseOldRenderData();
-	bool isChunkCanBeRendered(const IntCoord &coord) const;
+	bool isChunkCanBeRendered(const IntCoord &coord, bool ignoreBlockCount) const;
 	
 	Tick _renderTick;
 	size_t _maxRenderDataMemoryUse;
 	size_t _maxChunksMemoryUse;
+	
+	Chunk *makeChunkLoadRequest(const IntCoord &coord);
+	void _getCurrentChunks3x3x3Area(ChunkPtrMap &m, const IntCoord &center);
+	
+	struct Accessor
+	{
+		Accessor(World *world) : world(world) {}
+		
+		World *world;
+		
+		template<LightType lt>
+		LightValue *getLightRef(const math::ivec3 &v)
+		{
+			return world->getLightRef<lt>(v);
+		}
+		
+		CubeType getCubeAt(const math::ivec3 &v)
+		{
+			return world->getCubeAt(v);
+		}
+		
+		Chunk *getChunk(const IntCoord &coord)
+		{
+			return world->getChunk(coord);
+		}
+	};
 };
 
 #endif // WORLD_H

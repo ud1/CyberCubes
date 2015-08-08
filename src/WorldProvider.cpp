@@ -32,7 +32,14 @@ public:
 std::string getFileName(const math::ivec3 &pos)
 {
 	std::ostringstream oss;
-	oss << "world/" << (pos.x > 0 ? "p" : "n") << pos.x << (pos.y > 0 ? "p" : "n") << pos.y << (pos.z > 0 ? "p" : "n") << pos.z << ".wdat";
+	oss << "world/" << (pos.x > 0 ? "p" : "n") << std::abs(pos.x) << (pos.y > 0 ? "p" : "n") << std::abs(pos.y) << (pos.z > 0 ? "p" : "n") << std::abs(pos.z) << ".wdat";
+	return oss.str();
+}
+
+std::string getSLFileName(const math::ivec3 &pos)
+{
+	std::ostringstream oss;
+	oss << "world/" << (pos.x > 0 ? "p" : "n") << std::abs(pos.x) << (pos.y > 0 ? "p" : "n") << std::abs(pos.y) << (pos.z > 0 ? "p" : "n") << std::abs(pos.z) << ".sldat";
 	return oss.str();
 }
 
@@ -97,6 +104,31 @@ bool WorldProvider::load(Chunk &chunk, const math::ivec3 &pos)
 	return result;
 }
 
+bool WorldProvider::load(SunLightPropagationLayer &layer, const math::ivec3 &pos)
+{
+	std::string fileName = getSLFileName(pos);
+	std::ifstream file(fileName, std::ios::binary);
+
+	if (!file)
+		return false;
+	
+	file.read((char *) layer.numBlocks, sizeof(layer.numBlocks));
+	layer.isLoaded.store(true);
+	return true;
+}
+
+bool WorldProvider::save(const SunLightPropagationLayer &layer, const math::ivec3 &pos)
+{
+	std::string fileName = getSLFileName(pos);
+	std::ofstream file(fileName, std::ios::binary);
+
+	if (!file)
+		return false;
+	
+	file.write((const char *) layer.numBlocks, sizeof(layer.numBlocks));
+	return true;
+}
+
 void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 {
 
@@ -142,6 +174,9 @@ void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 	}
 
 	chunk.recalcBlockCount();
+	if (chunk.slpl)
+		chunk.computeSunLightPropagationLayer(*chunk.slpl);
+	
 	chunk.isLoaded.store(true);
 }
 

@@ -543,6 +543,7 @@ int main()
 
 	double globalT = 0.0f;
 
+	int blockType = 1;
 	while (bGameLoopRunning)
 	{
 		const boost::timer::cpu_times elapsed_times = timer.elapsed();
@@ -607,6 +608,15 @@ int main()
 
 			std::cout << "flyMode " << flyMode << std::endl;
 		}
+		
+		if (pressedKeys.count(SDLK_1))
+			blockType = 1;
+		
+		if (pressedKeys.count(SDLK_2))
+			blockType = 2;
+		
+		if (pressedKeys.count(SDLK_3))
+			blockType = 3;
 
 		if (flyMode)
 		{
@@ -872,7 +882,10 @@ int main()
 				if (b)
 				{
 
-					//std::cout << "POS " << bpos.x << " " << bpos.y << " " << bpos.z << std::endl;
+					//std::cout << "POS " << prevBPos.x << " " << prevBPos.y << " " << prevBPos.z << std::endl;
+					LightValue *lv = world.getLightRef<LIGHT_SUN>(prevBPos);
+					if (lv)
+						std::cout << "POSLV " << prevBPos.x << " " << prevBPos.y << " " << prevBPos.z << " " << (int) *lv << std::endl;
 
 					glUseProgram(wireframeBox.program);
 					glEnable(GL_DEPTH_TEST);
@@ -905,9 +918,9 @@ int main()
 
 					if (rClicked)
 					{
-						world.putBlock(prevBPos, 3);
+						world.putBlock(prevBPos, blockType);
 
-						std::vector<AddedBlockLight> addedBlocks;
+						/*std::vector<AddedBlockLight> addedBlocks;
 						std::vector<math::ivec3> removedBlocks;
 
 						static int k = 0;
@@ -932,7 +945,7 @@ int main()
 						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
 						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);
 						world.updateLight<LIGHT_B>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_SUN>(addedBlocks, removedBlocks);
+						world.updateLight<LIGHT_SUN>(addedBlocks, removedBlocks);*/
 
 						std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
 					}
@@ -941,13 +954,13 @@ int main()
 					{
 						world.putBlock(bpos, 0);
 
-						std::vector<AddedBlockLight> addedBlocks;
+						/*std::vector<AddedBlockLight> addedBlocks;
 						std::vector<math::ivec3> removedBlocks;
 						removedBlocks.push_back(bpos);
 						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
 						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);
 						world.updateLight<LIGHT_B>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_SUN>(addedBlocks, removedBlocks);
+						world.updateLight<LIGHT_SUN>(addedBlocks, removedBlocks);*/
 					}
 				}
 			}
