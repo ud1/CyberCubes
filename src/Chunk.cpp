@@ -63,6 +63,9 @@ void Chunk::put(const math::ivec3 &p, int type)
 	}
 	
 	t = type;
+	needToPersist = true;
+	if (slpl)
+		slpl->needToPersist = true;
 }
 
 

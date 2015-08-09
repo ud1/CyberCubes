@@ -116,6 +116,7 @@ struct SunLightPropagationLayer
 	unsigned char numBlocks[CHUNK_SIZE*CHUNK_SIZE];
 	
 	std::atomic_bool isLoaded, isCannotBeLoaded;
+	bool needToPersist = false;
 	
 	unsigned char &valueAt(int x, int y)
 	{
@@ -143,6 +144,7 @@ struct Chunk
 	Chunk *u, *d, *l, *r, *b, *f;
 	bool isDummy = false;
 	bool isDirty = false;
+	bool needToPersist = false;
 	unsigned blockCount;
 	
 	std::atomic_bool isLoaded, isLighted, isSunLighted;

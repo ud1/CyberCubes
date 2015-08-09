@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+
 project(cubercubes)
 
 if(CMAKE_COMPILER_IS_GNUCXX)
@@ -28,5 +30,5 @@ include_directories(include ${LUA_INCLUDE_DIR})
 install(TARGETS cubercubes RUNTIME DESTINATION bin)
 
 target_link_libraries(cubercubes
-    GL GLEW SDL2 SDL2_image boost_system boost_timer noise ${LUA_LIBRARIES} tolua++5.1 z
+    GL GLEW SDL2 SDL2_image boost_system boost_timer noise ${LUA_LIBRARIES} tolua++5.1 z sqlite3
 )

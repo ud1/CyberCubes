@@ -24,6 +24,21 @@ const int SZ = 16;
 
 void checkGLError(const char *str);
 
+struct WorldProviderTransaction
+{
+	WorldProviderTransaction(WorldProvider &provider) : provider(provider)
+	{
+		provider.beginTransaction();
+	}
+	
+	~WorldProviderTransaction()
+	{
+		provider.endTransaction();
+	}
+	
+	WorldProvider &provider;
+};
+
 World::World()
 {
 	_renderTick = 0;
@@ -59,10 +74,15 @@ World::~World()
 	_lightingChunksThread->join();
 	_loadSLLayerThread->join();
 	
+	WorldProviderTransaction transaction(worldProvider);
 	for (ChunkMap::const_iterator it = chunks.begin(); it != chunks.end(); ++it)
 	{
-		worldProvider.save(*it->second.get(), it->first, true);
-		worldProvider.save(sunLightPropagationLayerMap[it->first], it->first);
+		if (it->second.get()->needToPersist)
+			worldProvider.save(*it->second.get(), it->first, true);
+		
+		SunLightPropagationLayer &slpl = sunLightPropagationLayerMap[it->first];
+		if (slpl.needToPersist)
+			worldProvider.save(slpl, it->first);
 	}
 }
 
@@ -426,6 +446,8 @@ void World::_unloadUnusedChunks()
 			dataCoords.insert(std::make_pair(it->second->touchTick, it->first));
 		}
 		
+		WorldProviderTransaction transaction(worldProvider);
+		
 		for (CoordsMap::iterator it = dataCoords.begin(); it != dataCoords.end(); ++it)
 		{
 			if (total <= _maxChunksMemoryUse)
@@ -440,8 +462,15 @@ void World::_unloadUnusedChunks()
 			
 			_unlinkChunk(it->second);
 			total -= sizeof(Chunk);
-			worldProvider.save(*chunks[it->second].get(), it->second, true);
-			worldProvider.save(sunLightPropagationLayerMap[it->second], it->second);
+			if (chunks[it->second].get()->needToPersist)
+				worldProvider.save(*chunks[it->second].get(), it->second, true);
+			
+			SunLightPropagationLayer &slpl = sunLightPropagationLayerMap[it->second];
+			if (slpl.needToPersist)
+			{
+				worldProvider.save(sunLightPropagationLayerMap[it->second], it->second);
+				slpl.needToPersist = false;
+			}
 			chunks.erase(it->second);
 		}
 	}

@@ -7,6 +7,7 @@
 #include <libnoise/noise.h>
 #include <zlib.h>
 #include <vector>
+#include <sqlite3.h>
 
 namespace
 {
@@ -29,7 +30,92 @@ public:
 
 }
 
-std::string getFileName(const math::ivec3 &pos)
+struct SqlLiteString
+{
+	char *str = nullptr;
+	
+	~SqlLiteString()
+	{
+		sqlite3_free(str);
+	}
+};
+
+WorldProvider::WorldProvider()
+{
+	db = nullptr;
+	selectChunkDataStmt = nullptr;
+	insertChunkDataStmt = nullptr;
+	selectChunkSLPStmt = nullptr;
+	insertChunkSLPStmt = nullptr;
+	int rc = sqlite3_open("world/world.db", &db);
+	if(rc)
+	{
+		std::cout << "Open world database error" << std::endl;
+		return;
+	}
+	
+	/* Create SQL statement */
+	{
+		const char *sql = "CREATE TABLE IF NOT EXISTS CHUNK("  \
+			"X INT NOT NULL," \
+			"Y INT NOT NULL," \
+			"Z INT NOT NULL," \
+			"DATA BLOB NOT NULL," \
+			"PRIMARY KEY (X, Y, Z));";
+
+		/* Execute SQL statement */
+		SqlLiteString errMsg;
+		rc = sqlite3_exec(db, sql, nullptr, 0, &errMsg.str);
+
+		if (rc != SQLITE_OK)
+			std::cout << "Create CHUNK table error: " << errMsg.str;
+	}
+	
+	{
+		const char *sql = "CREATE TABLE IF NOT EXISTS CHUNK_SLP("  \
+			"X INT NOT NULL," \
+			"Y INT NOT NULL," \
+			"Z INT NOT NULL," \
+			"DATA BLOB NOT NULL," \
+			"PRIMARY KEY (X, Y, Z));";
+
+		/* Execute SQL statement */
+		SqlLiteString errMsg;
+		rc = sqlite3_exec(db, sql, nullptr, 0, &errMsg.str);
+
+		if (rc != SQLITE_OK)
+			std::cout << "Create CHUNK_SLP table error: " << errMsg.str;
+	}
+	
+	rc = sqlite3_prepare_v2(db, "SELECT DATA FROM CHUNK WHERE X = ?1 AND Y = ?2 AND Z = ?3", -1, &selectChunkDataStmt, nullptr);
+	if (rc != SQLITE_OK)
+		std::cout << "Create SELECT chunk data prepared statement failed: " << rc << std::endl;
+	
+	rc = sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO CHUNK(X, Y, Z, DATA) VALUES(?1, ?2, ?3, ?4)", -1, &insertChunkDataStmt, nullptr);
+	if (rc != SQLITE_OK)
+		std::cout << "Create INSERT chunk data prepared statement failed: " << rc << std::endl;
+	
+	
+	rc = sqlite3_prepare_v2(db, "SELECT DATA FROM CHUNK_SLP WHERE X = ?1 AND Y = ?2 AND Z = ?3", -1, &selectChunkSLPStmt, nullptr);
+	if (rc != SQLITE_OK)
+		std::cout << "Create SELECT chunk SLP data prepared statement failed: " << rc << std::endl;
+	
+	rc = sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO CHUNK_SLP(X, Y, Z, DATA) VALUES(?1, ?2, ?3, ?4)", -1, &insertChunkSLPStmt, nullptr);
+	if (rc != SQLITE_OK)
+		std::cout << "Create INSERT chunk SLP data prepared statement failed: " << rc << std::endl;
+}
+
+WorldProvider::~WorldProvider()
+{
+
+	sqlite3_finalize(selectChunkDataStmt);
+	sqlite3_finalize(insertChunkDataStmt);
+	sqlite3_finalize(selectChunkSLPStmt);
+	sqlite3_finalize(insertChunkSLPStmt);
+	sqlite3_close(db);
+}
+
+/*std::string getFileName(const math::ivec3 &pos)
 {
 	std::ostringstream oss;
 	oss << "world/" << (pos.x > 0 ? "p" : "n") << std::abs(pos.x) << (pos.y > 0 ? "p" : "n") << std::abs(pos.y) << (pos.z > 0 ? "p" : "n") << std::abs(pos.z) << ".wdat";
@@ -41,26 +127,14 @@ std::string getSLFileName(const math::ivec3 &pos)
 	std::ostringstream oss;
 	oss << "world/" << (pos.x > 0 ? "p" : "n") << std::abs(pos.x) << (pos.y > 0 ? "p" : "n") << std::abs(pos.y) << (pos.z > 0 ? "p" : "n") << std::abs(pos.z) << ".sldat";
 	return oss.str();
-}
+}*/
 
 bool WorldProvider::save(const Chunk &chunk, const math::ivec3 &pos, bool rewrite)
 {
 	if (chunk.isDummy)
 		return false;
-
-	std::string fileName = getFileName(pos);
-
-	if (!rewrite)
-	{
-		std::ifstream file(fileName, std::ios::binary);
-
-		if (file)
-			return false;
-	}
-
-	std::ofstream file(fileName, std::ios::binary);
-
-	if (!file)
+	
+	if (!insertChunkDataStmt)
 		return false;
 	
 	uLongf outputSize = compressBound(sizeof(chunk.cubes));
@@ -70,68 +144,115 @@ bool WorldProvider::save(const Chunk &chunk, const math::ivec3 &pos, bool rewrit
 	int resultCode = compress2(buffer.data(), &outputSize, reinterpret_cast<const Bytef *>(chunk.cubes), sizeof(chunk.cubes), 3);
 	bool result = resultCode == Z_OK;
 	
-	file.write((char *) buffer.data(), outputSize);
-
-	//std::cout << "Save " << fileName << " " << (result ? "OK" : "FAIL") << std::endl;
-	return result;
+	if (!result)
+		return false;
+	
+	sqlite3_bind_int(insertChunkDataStmt, 1, pos.x);
+	sqlite3_bind_int(insertChunkDataStmt, 2, pos.y);
+	sqlite3_bind_int(insertChunkDataStmt, 3, pos.z);
+	sqlite3_bind_blob(insertChunkDataStmt, 4, (const void *) buffer.data(), outputSize, SQLITE_TRANSIENT);
+	int rc = sqlite3_step(insertChunkDataStmt);
+	
+	sqlite3_reset(insertChunkDataStmt);
+	
+	return rc == SQLITE_DONE;
 }
 
 bool WorldProvider::load(Chunk &chunk, const math::ivec3 &pos)
 {
-	std::string fileName = getFileName(pos);
-	std::ifstream file(fileName, std::ios::binary);
-
-	if (!file)
-		return false;
-
-	file.seekg(0, std::ios_base::end);
-	size_t fileSize = file.tellg();
-	
-	if (!fileSize)
+	if (!selectChunkDataStmt)
 		return false;
 	
-	file.seekg(0, std::ios_base::beg);
+	sqlite3_bind_int(selectChunkDataStmt, 1, pos.x);
+	sqlite3_bind_int(selectChunkDataStmt, 2, pos.y);
+	sqlite3_bind_int(selectChunkDataStmt, 3, pos.z);
+	int rc = sqlite3_step(selectChunkDataStmt);
+	if (rc != SQLITE_ROW)
+	{
+		sqlite3_reset(selectChunkDataStmt);
+		return false;
+	}
 	
-	std::vector<Bytef> buffer;
-	buffer.resize(fileSize);
-	file.read((char *) buffer.data(), fileSize);
+	const void *data = sqlite3_column_blob(selectChunkDataStmt, 0);
+	int dataLen = sqlite3_column_bytes(selectChunkDataStmt, 0);
+	if (!data)
+	{
+		sqlite3_reset(selectChunkDataStmt);
+		return false;
+	}
 	
 	uLongf destLen = sizeof(chunk.cubes);
-	int resultCode = uncompress(reinterpret_cast<Bytef *>(chunk.cubes), &destLen, buffer.data(), fileSize);
+	int resultCode = uncompress(reinterpret_cast<Bytef *>(chunk.cubes), &destLen, (const Bytef *) data, dataLen);
 	bool result = resultCode == Z_OK && destLen == sizeof(chunk.cubes);
 	
-	//std::cout << "Load " << fileName << " " << (result ? "OK" : "FAIL") << std::endl;
+	sqlite3_reset(selectChunkDataStmt);
 	return result;
 }
 
 bool WorldProvider::load(SunLightPropagationLayer &layer, const math::ivec3 &pos)
 {
-	std::string fileName = getSLFileName(pos);
-	std::ifstream file(fileName, std::ios::binary);
-
-	if (!file)
+	if (!selectChunkSLPStmt)
 		return false;
 	
-	file.read((char *) layer.numBlocks, sizeof(layer.numBlocks));
+	sqlite3_bind_int(selectChunkSLPStmt, 1, pos.x);
+	sqlite3_bind_int(selectChunkSLPStmt, 2, pos.y);
+	sqlite3_bind_int(selectChunkSLPStmt, 3, pos.z);
+	int rc = sqlite3_step(selectChunkSLPStmt);
+	if (rc != SQLITE_ROW)
+	{
+		sqlite3_reset(selectChunkSLPStmt);
+		return false;
+	}
+	
+	const void *data = sqlite3_column_blob(selectChunkSLPStmt, 0);
+	int dataLen = sqlite3_column_bytes(selectChunkSLPStmt, 0);
+	if (!data)
+	{
+		sqlite3_reset(selectChunkSLPStmt);
+		return false;
+	}
+	
+	uLongf destLen = sizeof(layer.numBlocks);
+	int resultCode = uncompress(reinterpret_cast<Bytef *>(layer.numBlocks), &destLen, (const Bytef *) data, dataLen);
+	bool result = resultCode == Z_OK && destLen == sizeof(layer.numBlocks);
+	
+	sqlite3_reset(selectChunkSLPStmt);
+	return result;
+	
+	layer.needToPersist = false;
 	layer.isLoaded.store(true);
 	return true;
 }
 
 bool WorldProvider::save(const SunLightPropagationLayer &layer, const math::ivec3 &pos)
 {
-	std::string fileName = getSLFileName(pos);
-	std::ofstream file(fileName, std::ios::binary);
-
-	if (!file)
+	if (!insertChunkSLPStmt)
 		return false;
 	
-	file.write((const char *) layer.numBlocks, sizeof(layer.numBlocks));
-	return true;
+	uLongf outputSize = compressBound(sizeof(layer.numBlocks));
+	std::vector<Bytef> buffer;
+	buffer.resize(outputSize);
+	
+	int resultCode = compress2(buffer.data(), &outputSize, reinterpret_cast<const Bytef *>(layer.numBlocks), sizeof(layer.numBlocks), 3);
+	bool result = resultCode == Z_OK;
+	
+	if (!result)
+		return false;
+	
+	sqlite3_bind_int(insertChunkSLPStmt, 1, pos.x);
+	sqlite3_bind_int(insertChunkSLPStmt, 2, pos.y);
+	sqlite3_bind_int(insertChunkSLPStmt, 3, pos.z);
+	sqlite3_bind_blob(insertChunkSLPStmt, 4, (const void *) buffer.data(), outputSize, SQLITE_TRANSIENT);
+	int rc = sqlite3_step(insertChunkSLPStmt);
+	
+	sqlite3_reset(insertChunkSLPStmt);
+
+	return rc == SQLITE_DONE;
 }
 
 void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 {
-
+	chunk.needToPersist = false;
 	if (!load(chunk, chunkCoord))
 	{
 		GradientModule gradientModule;
@@ -171,12 +292,33 @@ void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 				}
 			}
 		}
+		chunk.needToPersist = true;
 	}
 
 	chunk.recalcBlockCount();
 	if (chunk.slpl)
+	{
 		chunk.computeSunLightPropagationLayer(*chunk.slpl);
+		chunk.slpl->needToPersist = true;
+	}
 	
 	chunk.isLoaded.store(true);
 }
 
+void WorldProvider::beginTransaction()
+{
+	SqlLiteString errorMsg;
+	sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errorMsg.str);
+	
+	if (errorMsg.str)
+		std::cout << "Begin transaction error: " << errorMsg.str << std::endl;
+}
+
+void WorldProvider::endTransaction()
+{
+	SqlLiteString errorMsg;
+	sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errorMsg.str);
+	
+	if (errorMsg.str)
+		std::cout << "End transaction error: " << errorMsg.str << std::endl;
+}
