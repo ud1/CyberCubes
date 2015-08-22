@@ -4,24 +4,32 @@ layout(location = 0) out vec4 outputColor;
 layout(location = 1) out vec4 outputLight;
 layout(location = 2) out int outputMaterial;
 in vec4 fposition;
-in vec4 flight;
+in vec4 viewSpace;
+flat in vec2 fcolor;
 flat in int ftextureId;
+flat in mat2 fglightMat;
+flat in mat2 fslightMat;
 
 uniform vec3 norm;
+uniform float fogFar;
 
 void main()
 {
-  float lightValue = fposition.w;
+  float dist = length(viewSpace);
+  float fogFactor = (fogFar - dist)/(fogFar - 3*fogFar/4);
+  fogFactor = clamp( fogFactor, 0.0, 1.0 );
   vec3 coord = fract(fposition.xyz + vec3(0.5, 0.5, 0.5));
   float texCount = 2;
   
   if (norm.x != 0)
-    outputColor = vec4(lightValue, coord.yz, texCount);
+    outputColor = vec4(fogFactor, coord.yz, texCount);
   else if (norm.y != 0)
-    outputColor = vec4(lightValue, coord.xz, texCount);
+    outputColor = vec4(fogFactor, coord.xz, texCount);
   else
-    outputColor = vec4(lightValue, coord.xy, texCount);
+    outputColor = vec4(fogFactor, coord.xy, texCount);
   
   outputMaterial = ftextureId;
-  outputLight = flight;
+  float slight = dot(vec2(1 - outputColor.y, outputColor.y), fslightMat * vec2(1 - outputColor.z, outputColor.z));
+  float glight = dot(vec2(1 - outputColor.y, outputColor.y), fglightMat * vec2(1 - outputColor.z, outputColor.z));
+  outputLight = vec4(glight, slight, fcolor);
 }

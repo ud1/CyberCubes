@@ -1,9 +1,10 @@
-#include "Chunk.h"
+#include "Chunk.hpp"
 #include <cstring>
 #include <cmath>
 #include <algorithm>
 #include <boost/timer/timer.hpp>
 #include <cassert>
+#include "blockType.hpp"
 
 SunLightPropagationLayer::SunLightPropagationLayer() : isLoaded(false), isCannotBeLoaded(false)
 {
@@ -40,27 +41,38 @@ Chunk::Chunk() : isLoaded(false), isLighted(false), isSunLighted(false)
 	memset(light, 0, sizeof(light));
 	u = d = l = r = f = b = nullptr;
 	touchTick = 0;
-	blockCount = 0;
+	opaqueBlockCount = 0;
+	nonOpaqueBlockCount = 0;
 	slpl = nullptr;
 	sunLightRecalculating = false;
 }
 
-void Chunk::put(const math::ivec3 &p, int type)
+void Chunk::put(const math::ivec3 &p, CubeType type)
 {
 	CubeType &t = cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
 	
-	if (t == 0 && type > 0)
+	if (slpl)
 	{
-		++blockCount;
-		if (slpl)
+		if (isSunFullyTransparent(t) && !isSunFullyTransparent(type))
+		{
 			++slpl->valueAt(p.x, p.y);
-	}
-	else if (t > 0 && type == 0)
-	{
-		--blockCount;
-		if (slpl)
+		}
+		else if (!isSunFullyTransparent(t) && isSunFullyTransparent(type))
+		{
+
 			--slpl->valueAt(p.x, p.y);
+		}
 	}
+	
+	if (isOpaque(t))
+		--opaqueBlockCount;
+	else
+		++opaqueBlockCount;
+	
+	if (isOpaque(type))
+		++opaqueBlockCount;
+	else if (type > 0)
+		++nonOpaqueBlockCount;
 	
 	t = type;
 	needToPersist = true;
@@ -71,56 +83,26 @@ void Chunk::put(const math::ivec3 &p, int type)
 
 bool Chunk::hasEdge(const math::ivec3 &p, Dir dir) const
 {
-	if (!cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z])
+	CubeType t = rawCubeAt(p);
+	if (!isSolid(t))
 		return false;
-
-	if ((dir == Dir::XN && p.x == 0) ||
-			(dir == Dir::XP && p.x == (CHUNK_SIZE - 1)) ||
-			(dir == Dir::YN && p.y == 0) ||
-			(dir == Dir::YP && p.y == (CHUNK_SIZE - 1)) ||
-			(dir == Dir::ZN && p.z == 0) ||
-			(dir == Dir::ZP && p.z == (CHUNK_SIZE - 1)))
-	{
-		return true;
-	}
-
-	switch (dir)
-	{
-	case Dir::XN:
-		return cubes[(((p.x - 1) * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z] == 0;
-
-	case Dir::XP:
-		return cubes[(((p.x + 1) * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z] == 0;
-
-	case Dir::YN:
-		return cubes[((p.x * CHUNK_SIZE) + (p.y - 1)) * CHUNK_SIZE + p.z] == 0;
-
-	case Dir::YP:
-		return cubes[((p.x * CHUNK_SIZE) + (p.y + 1)) * CHUNK_SIZE + p.z] == 0;
-
-	case Dir::ZN:
-		return cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z - 1] == 0;
-
-	case Dir::ZP:
-		return cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z + 1] == 0;
-	}
-
-	assert(false);
-	return false;
-}
-
-int Chunk::getSunLight(int x, int y) const
-{
-	if (isDummy)
-		return MAX_LIGHT;
-
-	for (int z = CHUNK_SIZE; z -- > 0;)
-	{
-		if (cubeAt(math::ivec3(x, y, z)))
-			return 0;
-	}
-
-	return u->getSunLight(x, y);
+	
+	math::ivec3 p2 = p;
+	if (dir == Dir::XN)
+		--p2.x;
+	else if (dir == Dir::XP)
+		++p2.x;
+	else if (dir == Dir::YN)
+		--p2.y;
+	else if (dir == Dir::YP)
+		++p2.y;
+	else if (dir == Dir::ZN)
+		--p2.z;
+	else if (dir == Dir::ZP)
+		++p2.z;
+	
+	CubeType t2 = cubeAt(p2);
+	return !isOpaque(t2);
 }
 
 void Chunk::computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const
@@ -133,7 +115,7 @@ void Chunk::computeSunLightPropagationLayer(SunLightPropagationLayer &layer) con
 
 			for (int z = 0; z < CHUNK_SIZE; ++z)
 			{
-				if (cubeAt(math::ivec3(x, y, z)) > 0)
+				if (rawCubeAt(math::ivec3(x, y, z)) > 0)
 					++num;
 			}
 
@@ -146,67 +128,6 @@ void Chunk::computeSunLightPropagationLayer(SunLightPropagationLayer &layer) con
 void Chunk::updateLight()
 {
 	memset(light, 0, sizeof(light));
-}
-
-void Chunk::updateSunLight()
-{
-	memset(light[LIGHT_SUN], 0, sizeof(light[LIGHT_SUN]));
-
-	for (unsigned int x = 0; x < CHUNK_SIZE; ++x)
-	{
-		for (unsigned int y = 0; y < CHUNK_SIZE; ++y)
-		{
-			if (!u->getSunLight(x, y))
-				continue;
-
-			for (unsigned int z = CHUNK_SIZE; z -- > 0;)
-			{
-				if (z > 0 && cubes[((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z - 1])
-				{
-					light[LIGHT_SUN][((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = MAX_LIGHT;
-					break;
-				}
-				else
-				{
-					light[LIGHT_SUN][((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = MAX_LIGHT;
-				}
-			}
-		}
-	}
-}
-
-int Chunk::updateSunLightIter()
-{
-	int res = 0;
-
-	for (unsigned int x = 0; x < CHUNK_SIZE; ++x)
-	{
-		for (unsigned int y = 0; y < CHUNK_SIZE; ++y)
-		{
-			for (unsigned int z = 0; z < CHUNK_SIZE; ++z)
-			{
-				if (!cubes[((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z])
-				{
-					LightValue v1 = lightAt<LIGHT_SUN>(math::ivec3(x - 1, y, z));
-					LightValue v2 = lightAt<LIGHT_SUN>(math::ivec3(x + 1, y, z));
-					LightValue v3 = lightAt<LIGHT_SUN>(math::ivec3(x, y - 1, z));
-					LightValue v4 = lightAt<LIGHT_SUN>(math::ivec3(x, y + 1, z));
-					LightValue v5 = lightAt<LIGHT_SUN>(math::ivec3(x, y, z - 1));
-					LightValue v6 = lightAt<LIGHT_SUN>(math::ivec3(x, y, z + 1));
-
-					LightValue v = std::max(std::max(std::max(std::max(std::max(v1, v2), v3), v4), v5), v6) - 1;
-
-					if (lightAt<LIGHT_SUN>(math::ivec3(x, y, z)) < v)
-					{
-						light[LIGHT_SUN][((x * CHUNK_SIZE) + y) * CHUNK_SIZE + z] = v;
-						++res;
-					}
-				}
-			}
-		}
-	}
-
-	return res;
 }
 
 template <LightType lt>
@@ -226,13 +147,6 @@ LightVal<lt> Chunk::lightAt(const math::ivec3 &p) const
 {
 	if (isDummy)
 		return getDummyLight<lt>();
-
-	/*if (p.z < 0 && d->isDummy || p.z >= CHUNK_SIZE && u->isDummy)
-	    return MAX_LIGHT;
-
-	if (p.x < 0 && l->isDummy || p.x >= CHUNK_SIZE && r->isDummy ||
-		p.y < 0 && b->isDummy || p.y >= CHUNK_SIZE && f->isDummy)
-	    return MAX_LIGHT;*/
 
 	if (p.x < 0)
 		return l->lightAt<lt>(math::ivec3(p.x + CHUNK_SIZE, p.y, p.z));
@@ -255,26 +169,60 @@ LightVal<lt> Chunk::lightAt(const math::ivec3 &p) const
 	return rawLightAt<lt>(p);
 }
 
+CubeType Chunk::cubeAt(const math::ivec3 &p) const
+{
+	if (isDummy)
+		return 1;
+
+	if (p.x < 0)
+		return l->cubeAt(math::ivec3(p.x + CHUNK_SIZE, p.y, p.z));
+
+	if (p.x >= (int) CHUNK_SIZE)
+		return r->cubeAt(math::ivec3(p.x - CHUNK_SIZE, p.y, p.z));
+
+	if (p.y < 0)
+		return b->cubeAt(math::ivec3(p.x, p.y + CHUNK_SIZE, p.z));
+
+	if (p.y >= (int) CHUNK_SIZE)
+		return f->cubeAt(math::ivec3(p.x, p.y - CHUNK_SIZE, p.z));
+
+	if (p.z < 0)
+		return d->cubeAt(math::ivec3(p.x, p.y, p.z + CHUNK_SIZE));
+
+	if (p.z >= (int) CHUNK_SIZE)
+		return u->cubeAt(math::ivec3(p.x, p.y, p.z - CHUNK_SIZE));
+
+	return rawCubeAt(p);
+}
+
 template LightValue Chunk::lightAt<LIGHT_SUN>(const math::ivec3 &p) const;
 template LightValue Chunk::lightAt<LIGHT_R>(const math::ivec3 &p) const;
 template LightValue Chunk::lightAt<LIGHT_G>(const math::ivec3 &p) const;
 template LightValue Chunk::lightAt<LIGHT_B>(const math::ivec3 &p) const;
 template math::ivec4 Chunk::lightAt<LIGHT_SUNRGBA>(const math::ivec3 &p) const;
 
-CubeType Chunk::cubeAt(const math::ivec3 &p) const
+CubeType Chunk::rawCubeAt(const math::ivec3 &p) const
 {
 	return cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
 }
 
 void Chunk::recalcBlockCount()
 {
-	unsigned count = 0;
+	unsigned opaqueCount = 0;
+	unsigned nonOpaqueCount = 0;
 
 	for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE; ++i)
 	{
-		if (cubes[i] > 0)
-			++count;
+		CubeType t = cubes[i];
+		if (t > 0)
+		{
+			if (isOpaque(t))
+				++opaqueCount;
+			else
+				++nonOpaqueCount;
+		}
 	}
 
-	blockCount = count;
+	opaqueBlockCount = opaqueCount;
+	nonOpaqueBlockCount = nonOpaqueCount;
 }

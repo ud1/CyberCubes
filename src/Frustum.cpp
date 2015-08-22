@@ -1,4 +1,4 @@
-#include "Frustum.h"
+#include "Frustum.hpp"
 
 #include <iostream>
 

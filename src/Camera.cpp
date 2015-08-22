@@ -1,4 +1,4 @@
-#include "Camera.h"
+#include "Camera.hpp"
 #include <glm/ext.hpp>
 #include <iostream>
 
@@ -9,7 +9,7 @@ Camera::Camera()
 	r = math::vec3(1.0f, 0.0f, 0.0f);
 	yaw = pitch = 0.0f;
 	pitch = 0.0f;
-	fov = 60.0f / 180.0 * M_PI;
+	fov = 80.0f / 180.0 * M_PI;
 	aspectRatio = 1.0f;
 	zNear = 0.02f;
 	zFar = 1000.0f;

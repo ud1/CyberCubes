@@ -1,8 +1,8 @@
 #ifndef WORLDPROVIDER_H
 #define WORLDPROVIDER_H
 
-#include "Chunk.h"
-#include "Math.h"
+#include "Chunk.hpp"
+#include "Math.hpp"
 
 struct sqlite3;
 struct sqlite3_stmt;

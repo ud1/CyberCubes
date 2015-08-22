@@ -1,8 +1,8 @@
-#include "Block.h"
+#include "Block.hpp"
 #include <unordered_map>
 #include <iostream>
-#include "Chunk.h"
-#include "Math.h"
+#include "Chunk.hpp"
+#include "Math.hpp"
 
 typedef std::unordered_map<int, Block> BlocksById;
 typedef std::unordered_map<std::string, const Block *> BlocksByName;
@@ -31,9 +31,9 @@ void Block::registerBlock()
 	std::cout << "Register block, id = " << id << ", name = " << name << std::endl;
 }
 
-const Block *Block::get(int id)
+Block *Block::get(int id)
 {
-	BlocksById::const_iterator it = blocksById.find(id);
+	BlocksById::iterator it = blocksById.find(id);
 	if (it == blocksById.end())
 		return nullptr;
 

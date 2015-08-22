@@ -1,1 +1,2 @@
-$hfile "Block.h"
+$hfile "blockType.hpp"
+$hfile "Block.hpp"

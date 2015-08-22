@@ -1,66 +1,33 @@
-//compile with this command on my Ubuntu 12.04 machine:
-//gcc sdl2-opengl-sample.c -o sdl2-opengl-sample -Wall -std=c99 -I/usr/local/include/SDL2 -lSDL2 -I/usr/include/GL -lGL -lGLEW -Wall
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <iostream>
-#include "Camera.h"
+#include "Camera.hpp"
 #include <set>
+#include <time.h> 
 
 #include <boost/timer/timer.hpp>
 #include <cmath>
 #include <boost/scoped_ptr.hpp>
-#include "Chunk.h"
-#include "RenderData.h"
-#include "World.h"
-#include "Frustum.h"
-#include "Shader.h"
-#include "colorTransform.h"
+#include "Chunk.hpp"
+#include "RenderData.hpp"
+#include "World.hpp"
+#include "Frustum.hpp"
+#include "Shader.hpp"
+#include "colorTransform.hpp"
 #include <lua.h>
 #include <lualib.h>
 #include <tolua.h>
+#include <sstream>
+#include <iomanip> 
 
-#include "Player.h"
+#include <nanovg.h>
+#define NANOVG_GL3_IMPLEMENTATION
+#include "nanovg_gl.h"
 
-static const struct
-{
-	unsigned int 	 width;
-	unsigned int 	 height;
-	unsigned int 	 bytes_per_pixel; /* 2:RGB16, 3:RGB, 4:RGBA */
-	unsigned char	 pixel_data[16 * 16 * 3 + 1];
-} block_image =
-{
-	16, 16, 3,
-	"\177\177\177tttttttttttt\177\177\177\217\217\217\217\217\217hhh\217\217\217"
-	"\177\177\177tttttttttttt\177\177\177\177\177\177\177\177\177\217\217\217"
-	"\217\217\217\217\217\217\217\217\217ttttttttt\217\217\217\217\217\217\217"
-	"\217\217hhh\177\177\177\177\177\177ttt\177\177\177hhhtttttthhhttttttttt\217"
-	"\217\217ttt\177\177\177\177\177\177\177\177\177\217\217\217\177\177\177\177"
-	"\177\177\177\177\177\217\217\217\177\177\177\177\177\177\177\177\177hhh\177"
-	"\177\177\217\217\217\177\177\177\177\177\177ttttttttttttttt\177\177\177\177"
-	"\177\177\217\217\217\217\217\217ttttttttttttttttttttt\217\217\217\217\217"
-	"\217\217\217\217\217\217\217\217\217\217hhhtttttt\177\177\177\177\177\177"
-	"\177\177\177ttttttttt\177\177\177hhh\177\177\177\177\177\177tttttthhh\177"
-	"\177\177\217\217\217\217\217\217\177\177\177\200\200\200\177\177\177ttt\217"
-	"\217\217\217\217\217\177\177\177\177\177\177\177\177\177\177\177\177\217"
-	"\217\217\217\217\217\217\217\217hhh\177\177\177\177\177\177\177\177\177t"
-	"ttttttttttttttttthhhtttttttttttt\177\177\177\177\177\177\177\177\177\217"
-	"\217\217\217\217\217hhh\217\217\217ttt\177\177\177\177\177\177\177\177\177"
-	"\217\217\217\217\217\217\217\217\217\217\217\217\217\217\217\217\217\217"
-	"\217\217\217\177\177\177tttttttttttttttttt\177\177\177hhh\177\177\177\177"
-	"\177\177ttttttttt\217\217\217\177\177\177\177\177\177\177\177\177\217\217"
-	"\217tttttt\217\217\217\217\217\217ttthhhttt\217\217\217\217\217\217\217\217"
-	"\217\177\177\177\177\177\177\177\177\177hhh\177\177\177\177\177\177\177\177"
-	"\177ttt\177\177\177\177\177\177\177\177\177\217\217\217\217\217\217\177\177"
-	"\177\177\177\177\177\177\177\217\217\217\217\217\217hhh\177\177\177ttttt"
-	"tttttttttttttttt\217\217\217\217\217\217ttttttttttttttt\177\177\177\177\177"
-	"\177\217\217\217\217\217\217\217\217\217\217\217\217\217\217\217\177\177"
-	"\177ttttttttthhhttt\177\177\177\177\177\177\217\217\217\217\217\217\177\177"
-	"\177\177\177\177\177\177\177ttttttttttttttt\177\177\177\177\177\177\217\217"
-	"\217\217\217\217\177\177\177tttttt\177\177\177tttttttttttthhh\217\217\217"
-	"\217\217\217\177\177\177\177\177\177\177\177\177\177\177\177ttttttttt\177"
-	"\177\177\177\177\177",
-};
+#include "Player.hpp"
+#include "Block.hpp"
+#include "Inventory.hpp"
 
 static const struct
 {
@@ -68,81 +35,41 @@ static const struct
 	unsigned int 	 height;
 	unsigned int 	 bytes_per_pixel; /* 2:RGB16, 3:RGB, 4:RGBA */
 	unsigned char	 pixel_data[16 * 16 * 3 + 1];
-} block_image2 =
+} dummy_image =
 {
 	16, 16, 3,
-	"\271\205\\\226lJ\226lJyU:yU:\271\205\\\226lJ\226lJyU:yU:Y=)yU:yU:\271\205"
-	"\\yU:\271\205\\yU:\226lJY=)yU:yU:\226lJ\207\207\207Y=)yU:\271\205\\\226l"
-	"JyU:\271\205\\\226lJY=)Y=)\271\205\\yU:yU:Y=)\271\205\\yU:yU:yU:\271\205"
-	"\\yU:yU:yU:Y=)Y=)\271\205\\yU:\226lJlll\271\205\\yU:\226lJY=)yU:\271\205"
-	"\\\226lJ\226lJyU:\226lJyU:\271\205\\\226lJyU:\226lJyU:\226lJ\271\205\\Y="
-	")\226lJyU:yU:\226lJY=)yU:lllyU:\226lJY=)yU:yU:Y=)\226lJ\226lJyU:\226lJY="
-	")Y=)Y=)yU:yU:Y=)yU:yU:yU:\271\205\\\271\205\\yU:yU:yU:\207\207\207yU:yU:"
-	"\271\205\\\271\205\\yU:\271\205\\\271\205\\yU:\226lJyU:\226lJyU:yU:\271\205"
-	"\\\271\205\\\226lJ\226lJyU:yU:\226lJY=)\226lJ\226lJyU:yU:\226lJ\226lJ\226"
-	"lJyU:yU:\226lJyU:\226lJyU:Y=)yU:\226lJ\226lJyU:yU:yU:Y=)yU:yU:\226lJY=)y"
-	"U:yU:Y=)Y=)yU:yU:yU:yU:yU:\271\205\\\271\205\\yU:\226lJyU:\226lJyU:\271\205"
-	"\\\271\205\\yU:\271\205\\\226lJY=)\271\205\\\271\205\\Y=)\226lJ\226lJ\207"
-	"\207\207yU:\226lJyU:yU:\226lJ\226lJ\271\205\\yU:\226lJlll\226lJ\226lJyU:"
-	"Y=)\226lJyU:Y=)yU:Y=)\226lJyU:\226lJ\226lJ\271\205\\yU:yU:yU:yU:yU:yU:yU"
-	":\271\205\\\271\205\\yU:\226lJyU:yU:tXDyU:\226lJ\226lJyU:Y=)\271\205\\Y="
-	")yU:\271\205\\\226lJ\226lJ\226lJyU:Y=)\271\205\\yU:Y=)yU:Y=)\271\205\\\271"
-	"\205\\yU:\226lJyU:yU:\226lJ\226lJ\226lJyU:\271\205\\\226lJ\226lJyU:\207\207"
-	"\207yU:\226lJ\226lJyU:yU:\226lJ\226lJyU:Y=)",
-};
-
-static const struct
-{
-	unsigned int 	 width;
-	unsigned int 	 height;
-	unsigned int 	 bytes_per_pixel; /* 2:RGB16, 3:RGB, 4:RGBA */
-	unsigned char	 pixel_data[16 * 16 * 3 + 1];
-} light_image =
-{
-	16, 16, 3,
-	"\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
-	"\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
-	"\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
-	"\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
-	"\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
-	"\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
-	"\356\356\356\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\356\356\356\356\356\356\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\356\356\356\356\356\356\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377"
-	"\377\377\377\377\377\377\377\377\377\377\377\377\377\377\377\356\356\356"
-	"\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
-	"\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356\356"
-	"\356\356\356\356\356\356\356\356\356\356\356\356",
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0"
+	"\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0\377\377\377\0\0\0",
 };
 
 unsigned char colorMap[256 * 256 * 3];
@@ -285,7 +212,40 @@ struct FloatSmoothing
 	}
 };
 
+bool loadFonts(NVGcontext* vg)
+{
+	int font;
+	font = nvgCreateFont(vg, "sans", "fonts/Roboto-Regular.ttf");
+	if (font == -1)
+	{
+		std::cout << "Could not add font regular." << std::endl;
+		return false;
+	}
+	font = nvgCreateFont(vg, "sans-bold", "fonts/Roboto-Bold.ttf");
+	if (font == -1)
+	{
+		std::cout << "Could not add font bold." << std::endl;
+		return false;
+	}
+	return true;
+}
+
+void render2d(SDL_Window *window, NVGcontext* vg);
+
 using namespace cyberCubes;
+using namespace cyberCubes::gui;
+
+
+
+namespace
+{
+	double g_timeElapsed = 0;
+	
+	Inventory *inventory;
+	bool inventoryShow = false;
+	
+	Camera camera;
+}
 
 int main()
 {
@@ -351,10 +311,10 @@ int main()
 
 	World world;
 	world.create();
-	
+
 	Player player(&world);
 
-	Shader quadShader;
+	Shader quadShader("quadShader1");
 
 	if (!quadShader.buildShaderProgram("quadvs1.glsl", "quadfs1.glsl"))
 	{
@@ -362,7 +322,7 @@ int main()
 		return 0;
 	}
 
-	Shader quadShader2;
+	Shader quadShader2("quadShader2");
 
 	if (!quadShader2.buildShaderProgram("quadvs1.glsl", "quadfs2.glsl"))
 	{
@@ -370,7 +330,7 @@ int main()
 		return 0;
 	}
 
-	Shader wireframeBox;
+	Shader wireframeBox("wireframeBoxShader");
 
 	if (!wireframeBox.buildShaderProgram("wireframeBoxvs.glsl", "wireframeBoxgs.glsl", "wireframeBoxfs.glsl"))
 	{
@@ -378,7 +338,6 @@ int main()
 		return 0;
 	}
 
-	Camera camera;
 	camera.position = math::vec3(0.0f, 0.0f, 300.0f);
 	camera.aspectRatio = (float) width / (float) height;
 	math::Frustum frustum;
@@ -392,8 +351,6 @@ int main()
 	boost::timer::cpu_timer timer;
 
 	glEnable(GL_DEPTH_TEST);
-
-
 
 	GLuint frameBuffer;
 	glGenFramebuffers(1, &frameBuffer);
@@ -461,13 +418,77 @@ int main()
 	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
 	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
-	GLuint	blockTexture;
+	int blockTextureId = 0;
+	const int MAX_BLOCK_TYPES = 40000;
+	std::map<int, SDL_Surface *> images;
+	std::map<std::string, int> textureNameIdMap;
+
+	for (int type = 0; type < MAX_BLOCK_TYPES; ++type)
+	{
+		Block *block = Block::get(type);
+
+		if (block)
+		{
+			if (textureNameIdMap.count(block->mainTexture))
+			{
+				block->textureId = textureNameIdMap[block->mainTexture];
+			}
+			else
+			{
+				SDL_Surface *image = IMG_Load(block->mainTexture.c_str());
+
+				if (!image || image->w != 16 || image->h != 16)
+				{
+					std::cout << "Wrong image " << type << std::endl;
+
+					block->textureId = 0;
+					textureNameIdMap[block->mainTexture] = 0;
+					continue;
+				}
+
+				images[++blockTextureId] = image;
+				block->textureId = blockTextureId;
+				textureNameIdMap[block->mainTexture] = blockTextureId;
+			}
+		}
+	}
+
+	GLuint blockTexture;
 	glGenTextures(1, &blockTexture);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
-	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 4, GL_RGB8, 16, 16, 3);
-	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, 16, 16, 1, GL_RGB, GL_UNSIGNED_BYTE, block_image.pixel_data);
-	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 1, 16, 16, 1, GL_RGB, GL_UNSIGNED_BYTE, block_image2.pixel_data);
-	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 2, 16, 16, 1, GL_RGB, GL_UNSIGNED_BYTE, light_image.pixel_data);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 4, GL_RGBA8, 16, 16, blockTextureId + 1);
+	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, 16, 16, 1, GL_RGB, GL_UNSIGNED_BYTE, dummy_image.pixel_data);
+
+	for (std::map<int, SDL_Surface *>::iterator it = images.begin(); it != images.end(); ++it)
+	{
+		SDL_Surface *image = it->second;
+		int bpp = image->format->BytesPerPixel;
+
+		unsigned char data[16 * 16 * 4];
+
+		for (int y = 0; y < 16; ++y)
+		{
+			for (int x = 0; x < 16; ++x)
+			{
+				Uint8 *p = (Uint8 *)image->pixels + y * image->pitch + x * bpp;
+
+				data[(y * 16 + x) * 4 + 0] = p[0];
+				data[(y * 16 + x) * 4 + 1] = p[1];
+				data[(y * 16 + x) * 4 + 2] = p[2];
+				
+				if (bpp == 4)
+					data[(y * 16 + x) * 4 + 3] = p[3];
+				else
+					data[(y * 16 + x) * 4 + 3] = 255;
+			}
+		}
+
+		glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, it->first, 16, 16, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		SDL_FreeSurface(image);
+		
+		std::cout << "Image " << it->first << " Loaded" << std::endl;
+	}
+
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -536,7 +557,6 @@ int main()
 
 	bool pause = false;
 
-	float lightMultiplier = 1.0;
 	glPolygonOffset(1.0, 1.0);
 
 	bool flyMode = true;
@@ -544,8 +564,29 @@ int main()
 	double globalT = 0.0f;
 
 	int blockType = 1;
+
+	NVGcontext* vg = nvgCreateGL3(NVG_STENCIL_STROKES | NVG_DEBUG);
+	if (!vg)
+	{
+		std::cout << "Could not init nanovg." << std::endl;
+		return -1;
+	}
+	
+	if (!loadFonts(vg))
+		return -1;
+	
+	inventory = new Inventory(*vg);
+	
+	GLuint timerQuery;
+	glGenQueries(1, &timerQuery);
+	
+	bool lPressed = false;
+	bool rPressed = false;
+	
 	while (bGameLoopRunning)
 	{
+		glBeginQuery(GL_TIME_ELAPSED, timerQuery);
+		
 		const boost::timer::cpu_times elapsed_times = timer.elapsed();
 		boost::timer::nanosecond_type const elapsed(elapsed_times.wall);
 		float dt = (double) elapsed / 1.0e9;
@@ -587,11 +628,23 @@ int main()
 			if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT)
 			{
 				rClicked = true;
+				rPressed = true;
 			}
 
 			if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
 			{
 				lClicked = true;
+				lPressed = true;
+			}
+			
+			if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT)
+			{
+				rPressed = false;
+			}
+			
+			if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
+			{
+				lPressed = false;
 			}
 		}
 
@@ -608,16 +661,38 @@ int main()
 
 			std::cout << "flyMode " << flyMode << std::endl;
 		}
-		
+
 		if (pressedKeys.count(SDLK_1))
-			blockType = 1;
-		
+			blockType = 30001;
+
 		if (pressedKeys.count(SDLK_2))
 			blockType = 2;
-		
+
 		if (pressedKeys.count(SDLK_3))
 			blockType = 3;
+		
+		if (pressedKeys.count(SDLK_4))
+			blockType = 4;
+		
+		if (pressedKeys.count(SDLK_5))
+			blockType = 5;
+		
+		if (pressedKeys.count(SDLK_6))
+			blockType = 6;
+		
+		if (pressedKeys.count(SDLK_7))
+			blockType = 7;
+		
+		if (pressedKeys.count(SDLK_8))
+			blockType = 8;
+		
+		if (pressedKeys.count(SDLK_9))
+			blockType = 30000;
 
+		if (pressedKeys.count(SDLK_e))
+			inventoryShow = !inventoryShow;
+		
+		
 		if (flyMode)
 		{
 			math::vec3 accel = math::vec3(0.0f, 0.0f, 0.0f);
@@ -705,43 +780,75 @@ int main()
 			math::vec3 dirR = camera.transform(0.0, 1.0f, 0.0f);
 			dirR.z = 0.0f;
 			dirR = math::normalize(dirR) * MAX_ACCEL;
-
-			if (keys.count(SDLK_w))
-				accel += dirF;
-
-			if (keys.count(SDLK_s))
-				accel -= dirF;
-
-			if (keys.count(SDLK_d))
-				accel += dirR;
-
-			if (keys.count(SDLK_a))
-				accel -= dirR;
-
-			if (pressedKeys.count(SDLK_SPACE))
+			
+			math::vec3 playerSize = math::vec3(0.6f, 0.6f, 1.7f);
+			math::vec3 widePlayerSize = math::vec3(0.6f, 0.8f, 1.7f);
+			math::vec3 eyeOffset = math::vec3(0.3f, 0.3f, 1.6f);
+			bool touchGround = false, wideTouchGround = false;
 			{
-				vel.z = 5.0f;
+				math::vec3 corner = camera.position - eyeOffset;
+				math::BBox b(corner, playerSize);
+				math::vec3 dPos =  math::vec3(0, 0, -0.2f);
+				world.move(b, dPos);
+			
+				if (b.point.z > (corner.z + dPos.z + 1e-3))
+					touchGround = true;
+				
+				b.point = corner;
+				b.size = widePlayerSize;
+				
+				world.move(b, dPos);
+			
+				if (b.point.z > (corner.z + dPos.z + 1e-3))
+					wideTouchGround = true;
 			}
 
-			vel += accel * dt;
-			vel.z -= 9.8f * dt;
-			float hCoef = math::pow(0.5f, dt);
-			float vCoef = math::pow(0.98f, dt);
+			float velLen = math::length(vel);
+			
+			if (touchGround)
+			{
+				if (keys.count(SDLK_w))
+					accel += dirF;
 
-			vel = math::vec3(vel.x * hCoef, vel.y * hCoef, vel.z * vCoef);
-			math::vec3 hv = math::vec3(vel.x, vel.y, 0.0f);
-			const float DV = 5.0f * dt;
+				if (keys.count(SDLK_s))
+					accel -= dirF;
 
-			if (math::length(hv) > DV)
-				hv = math::normalize(hv) * DV;
+				if (keys.count(SDLK_d))
+					accel += dirR;
 
-			vel -= hv;
+				if (keys.count(SDLK_a))
+					accel -= dirR;
+
+				if (pressedKeys.count(SDLK_SPACE))
+					vel.z = 5.0f;
+			}
+			
+			if (wideTouchGround && !pressedKeys.count(SDLK_SPACE))
+			{
+				if (math::length(accel) > 0.01)
+					vel.z += 0.2 / (1.0f + velLen / 10.0f);
+			}
+			
+			vel += accel * dt / (1.0f + velLen / 10.0f);
+			vel.z -= 9.8f * dt;			
+			float fCoef = math::pow(0.98f, dt);
+
+			vel *= fCoef;
+			
+			if (touchGround)
+			{
+				math::vec3 hv = math::vec3(vel.x, vel.y, 0.0f);
+				const float DV = 5.0f * dt;
+
+				if (math::length(hv) > DV)
+					hv = math::normalize(hv) * DV;
+
+				vel -= hv;
+			}
 
 			math::vec3 dPos = vel * dt;
-			math::vec3 playerSize = math::vec3(0.6f, 0.6f, 1.7f);
-			math::vec3 eyeOffset = math::vec3(0.3f, 0.3f, 1.6f);
+			
 			math::BBox b(camera.position - eyeOffset, playerSize);
-
 			world.move(b, dPos);
 			dPos = b.point - (camera.position - eyeOffset);
 			vel = dPos / dt;
@@ -749,10 +856,15 @@ int main()
 			camera.position += dPos;
 		}
 
-		//world.dayNightLightCoef = 0.01f + 0.99*(1.0 + std::cos(globalT / 10.0))/2.0;
-		world.dayNightLightCoef = 1.0f;
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_BLEND);
+		glDisable(GL_SCISSOR_TEST);
+		
+		world.dayNightLightCoef = (1.0 + std::cos(globalT / 20.0))/2.0;
+		//world.dayNightLightCoef = 1.0f;
 		//std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
 
+		std::vector<IntCoord> nonOpaqueChunks;
 		{
 			checkGLError("1");
 			//boost::timer::auto_cpu_timer t;
@@ -777,7 +889,7 @@ int main()
 			checkGLError("2");
 			//glEnable(GL_POLYGON_OFFSET_FILL);
 			player.updatePosition(camera.position);
-			world.render(camera, player);
+			world.renderPass1(camera, player, nonOpaqueChunks);
 			//glDisable(GL_POLYGON_OFFSET_FILL);
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
@@ -786,18 +898,19 @@ int main()
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
 
 			//glFlush();
-			lightMultiplier = 1.0 / std::pow(0.02f, 1.0f - world.getMaxLightNearPoint(camera.position));
+			world.lightMultiplier = 1.0 / std::pow(0.02f, 1.0f - world.getMaxLightNearPoint(camera.position));
 
-			if (lightMultiplier > 2.0)
-				lightMultiplier = 2.0;
+			if (world.lightMultiplier > 2.0)
+				world.lightMultiplier = 2.0;
 
-			if (lightMultiplier < 1.0)
-				lightMultiplier = 1.0;
+			if (world.lightMultiplier < 1.0)
+				world.lightMultiplier = 1.0;
 
-			lightMultiplier = lightMultiplierSmoothing.set(lightMultiplier, dt);
+			world.lightMultiplier = lightMultiplierSmoothing.set(world.lightMultiplier, dt);
 
 			float skyLightMultiplier = std::pow(0.05f, 1.0f - world.dayNightLightCoef);
-			glClearColor(0.5 * lightMultiplier * skyLightMultiplier, 0.7 * lightMultiplier * skyLightMultiplier, 1.0 * lightMultiplier * skyLightMultiplier, 0.0);
+			world.fogColor = math::vec3(0.5, 0.7, 1.0) * world.lightMultiplier * skyLightMultiplier;
+			glClearColor(world.fogColor.x, world.fogColor.y, world.fogColor.z, 0.0);
 			glClear(GL_COLOR_BUFFER_BIT);
 
 			glDisable(GL_DEPTH_TEST);
@@ -859,7 +972,12 @@ int main()
 			if (quadShader.uniforms.count("lightMultiplier"))
 			{
 				//std::cout << "lightMultiplier " << lightMultiplier << std::endl;
-				glUniform1f(quadShader.uniforms["lightMultiplier"], lightMultiplier);
+				glUniform1f(quadShader.uniforms["lightMultiplier"], world.lightMultiplier);
+			}
+			
+			if (quadShader.uniforms.count("fogColor"))
+			{
+				glUniform3fv(quadShader.uniforms["fogColor"], 1, &world.fogColor[0]);
 			}
 
 			checkGLError("7");
@@ -883,9 +1001,12 @@ int main()
 				{
 
 					//std::cout << "POS " << prevBPos.x << " " << prevBPos.y << " " << prevBPos.z << std::endl;
-					LightValue *lv = world.getLightRef<LIGHT_SUN>(prevBPos);
+					/*LightValue *lv = world.getLightRef<LIGHT_SUN>(prevBPos);
+					LightValue *lv2 = world.getLightRef<LIGHT_SUN>(bpos);
 					if (lv)
 						std::cout << "POSLV " << prevBPos.x << " " << prevBPos.y << " " << prevBPos.z << " " << (int) *lv << std::endl;
+					if (lv2)
+						std::cout << "POSLV2 " << bpos.x << " " << bpos.y << " " << bpos.z << " " << (int) *lv2 << std::endl;/**/
 
 					glUseProgram(wireframeBox.program);
 					glEnable(GL_DEPTH_TEST);
@@ -916,56 +1037,23 @@ int main()
 					glDrawArrays(GL_POINTS, 0, 1);
 					glBindVertexArray(0);
 
-					if (rClicked)
+					if (rClicked || (rPressed && keys.count(SDLK_LSHIFT)))
 					{
 						world.putBlock(prevBPos, blockType);
-
-						/*std::vector<AddedBlockLight> addedBlocks;
-						std::vector<math::ivec3> removedBlocks;
-
-						static int k = 0;
-						k++;
-
-						if (k % 7 == 0)
-							addedBlocks.push_back( {prevBPos, {0, MAX_LIGHT, 0, 0}});
-						else if (k % 7 == 1)
-							addedBlocks.push_back( {prevBPos, {0, 0, MAX_LIGHT, 0}});
-						else if (k % 7 == 2)
-							addedBlocks.push_back( {prevBPos, {0, 0, 0, MAX_LIGHT}});
-						else if (k % 7 == 3)
-							addedBlocks.push_back( {prevBPos, {0, MAX_LIGHT, MAX_LIGHT, 0}});
-						else if (k % 7 == 4)
-							addedBlocks.push_back( {prevBPos, {0, MAX_LIGHT, 0, MAX_LIGHT}});
-						else if (k % 7 == 5)
-							addedBlocks.push_back( {prevBPos, {0, 0, MAX_LIGHT, MAX_LIGHT}});
-						else if (k % 7 == 6)
-							addedBlocks.push_back( {prevBPos, {0, MAX_LIGHT, MAX_LIGHT, MAX_LIGHT}});
-
-
-						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_B>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_SUN>(addedBlocks, removedBlocks);*/
 
 						std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
 					}
 
-					if (lClicked)
+					if (lClicked || (lPressed && keys.count(SDLK_LSHIFT)))
 					{
 						world.putBlock(bpos, 0);
-
-						/*std::vector<AddedBlockLight> addedBlocks;
-						std::vector<math::ivec3> removedBlocks;
-						removedBlocks.push_back(bpos);
-						world.updateLight<LIGHT_R>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_G>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_B>(addedBlocks, removedBlocks);
-						world.updateLight<LIGHT_SUN>(addedBlocks, removedBlocks);*/
 					}
 				}
 			}
 
 			checkGLError("9");
+			
+			world.renderPass2(camera, player, nonOpaqueChunks, blockTexture, HSColorTexture);
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -993,14 +1081,85 @@ int main()
 
 			glFinish();
 		}
+		
+		glEndQuery(GL_TIME_ELAPSED);
+		
+		GLint available = 0;
+		while (!available) {
+			glGetQueryObjectiv(timerQuery, GL_QUERY_RESULT_AVAILABLE, &available);
+		}
+		
+		GLuint64 timeElapsed;
+		glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
+		g_timeElapsed = g_timeElapsed * 0.95 + timeElapsed * 0.05;
 
+		render2d(window, vg);
+		
 		SDL_GL_SwapWindow(window);
 		//SDL_Delay(20);
 
+		if (pressedKeys.count(SDLK_F2))
+		{
+			int w, h;
+			SDL_GetWindowSize(window, &w, &h);
+			SDL_Surface *img = SDL_CreateRGBSurface(SDL_SWSURFACE, w, h, 24, 0x0000FF, 0x00FF00, 0xFF0000, 0x000000);
+			glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, img->pixels);
+			
+			int pitch = img->pitch;
+			for (int y = 0; y < h/2; ++y)
+			{
+				Uint8 *first = (Uint8*) img->pixels + pitch * y;
+				Uint8 *last =  (Uint8*) img->pixels + pitch * (h - 1 - y);
+				for (int x = 0; x < pitch; ++x)
+				{
+					std::swap(*(first + x), *(last + x));
+				}
+			}
+			
+			std::ostringstream fileName;
+			fileName << "screenshots/" << ::time(nullptr) << ".png";
+			IMG_SavePNG(img, fileName.str().c_str());
+			SDL_FreeSurface(img);
+		}
 	}
 
+	
+	nvgDeleteGL3(vg);
 	SDL_GL_DeleteContext(glContext);
 	SDL_Quit();
 	return 0;
 }
 
+int g_trisRendered = 0;
+
+void render2d(SDL_Window *window, NVGcontext* vg)
+{
+	int w, h;
+	SDL_GetWindowSize(window, &w, &h);
+
+	nvgBeginFrame(vg, w, h, 1);
+	
+	nvgMoveTo(vg, 200, 200);
+	
+	nvgFontFace(vg, "sans");
+	nvgFontSize(vg, 20.0f);
+	nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+	nvgFillColor(vg, nvgRGBA(50, 255, 50, 255));
+	
+	std::ostringstream oss;
+	oss << "Frame time " << std::setprecision(2) << g_timeElapsed / 1.0e6 << "ms";
+	nvgText(vg, 0, 0, oss.str().c_str(), nullptr);
+	
+	oss.str("");
+	oss << "Tris rendered " << g_trisRendered / 1000 << "K";
+	nvgText(vg, 0, 20, oss.str().c_str(), nullptr);
+	
+	oss.str("");
+	oss << "Pos " << std::fixed << std::setprecision(0) << camera.position.x << " " << camera.position.y << " " << camera.position.z;
+	nvgText(vg, 0, 40, oss.str().c_str(), nullptr);
+	
+	if (inventoryShow)
+		inventory->render(w, h);
+	
+	nvgEndFrame(vg);
+}

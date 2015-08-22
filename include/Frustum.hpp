@@ -1,7 +1,7 @@
 #ifndef FRUSTUM_H
 #define FRUSTUM_H
 
-#include "Math.h"
+#include "Math.hpp"
 
 namespace math
 {

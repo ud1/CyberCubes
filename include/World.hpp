@@ -6,15 +6,15 @@
 #include <memory>
 #include <GL/glew.h>
 #include <vector>
-#include "Math.h"
-#include "Frustum.h"
-#include "Shader.h"
-#include "Camera.h"
-#include "WorldProvider.h"
-#include "Chunk.h"
-#include "Player.h"
+#include "Math.hpp"
+#include "Frustum.hpp"
+#include "Shader.hpp"
+#include "Camera.hpp"
+#include "WorldProvider.hpp"
+#include "Chunk.hpp"
+#include "Player.hpp"
 #include "BlockingQueue.hpp"
-#include "GLQueryPool.h"
+#include "GLQueryPool.hpp"
 
 #include <thread>
 #include <memory>
@@ -64,11 +64,14 @@ public:
 	GLuint oqTriangleBufferObject = 0;
 	GLuint oqTriangleIndicesBufferObject = 0;
 	Shader oqShader;
-	Shader worldShader;
+	Shader worldShaderPass1, worldShaderPass2;
 	float dayNightLightCoef;
+	math::vec3 fogColor;
+	float lightMultiplier = 1.0;
 
 	void create();
-	void render(const Camera &camera, const cyberCubes::Player &player);
+	void renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks);
+	void renderPass2(const Camera &camera, const cyberCubes::Player &player, const std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint HSColorTexture);
 	float getMaxLightNearPoint(const math::vec3 &v);
 
 	template<LightType lt>

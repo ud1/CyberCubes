@@ -15,9 +15,11 @@ struct Block
 	int lightOpacity;
 	int lightValueSun, lightValueR, lightValueG, lightValueB;
 	float hardness;
+	
+	int textureId;
 
 	void registerBlock();
-	static const Block *get(int id);
+	static Block *get(int id);
 	static const Block *get(const std::string &name);
 };
 // tolua_end

@@ -1,11 +1,12 @@
-#include "Player.h"
-#include "World.h"
+#include "Player.hpp"
+#include "World.hpp"
 
 namespace cyberCubes {
 	
 Player::Player(World *world_)
 {
 	world = world_;
+	viewDistance = 4;
 }
 
 Player::~Player()
@@ -21,17 +22,19 @@ void Player::updatePosition(const math::vec3 &position_)
 	
 	IntCoord p = eucDivChunk(floorCoord(position));
 	
-	constexpr int RAD = 5;
-	for (int x = -RAD; x <= RAD; ++x)
+	for (int x = -viewDistance; x <= viewDistance; ++x)
 	{
-		for (int y = -RAD; y <= RAD; ++y)
+		for (int y = -viewDistance; y <= viewDistance; ++y)
 		{
-			for (int z = -RAD; z <= RAD; ++z)
+			for (int z = -viewDistance; z <= viewDistance; ++z)
 			{
-				IntCoord pos = p + IntCoord(x, y, z);
-				
-				if (world->isChunkCoordValid(pos))
-					chunks.insert(pos);
+				if (x * x + y * y + z * z <= (viewDistance + 1) * (viewDistance + 1))
+				{
+					IntCoord pos = p + IntCoord(x, y, z);
+					
+					if (world->isChunkCoordValid(pos))
+						chunks.insert(pos);
+				}
 			}
 		}
 	}

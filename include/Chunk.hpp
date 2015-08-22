@@ -1,12 +1,10 @@
 #ifndef CHUNK_H
 #define CHUNK_H
 
-#include "Math.h"
-#include <stdint.h>
+#include "Math.hpp"
 #include <atomic>
+#include "types.hpp"
 
-typedef signed char LightValue;
-typedef uint16_t CubeType;
 constexpr int MAX_LIGHT = 31;
 constexpr float MAX_LIGHT_F = MAX_LIGHT;
 constexpr size_t CHUNK_SIZE_LOG2 = 5;
@@ -145,7 +143,7 @@ struct Chunk
 	bool isDummy = false;
 	bool isDirty = false;
 	bool needToPersist = false;
-	unsigned blockCount;
+	unsigned opaqueBlockCount, nonOpaqueBlockCount;
 	
 	std::atomic_bool isLoaded, isLighted, isSunLighted;
 	bool sunLightRecalculating;
@@ -158,12 +156,9 @@ struct Chunk
 
 	Chunk();
 
-	void put(const math::ivec3 &p, int type);
+	void put(const math::ivec3 &p, CubeType type);
 	bool hasEdge(const math::ivec3 &p, Dir dir) const;
 	void updateLight();
-	void updateSunLight();
-	int updateSunLightIter();
-
 
 	template<LightType lt>
 	LightVal<lt> lightAt(const math::ivec3 &p) const;
@@ -184,7 +179,7 @@ struct Chunk
 	LightValue &lightRefAt(const math::ivec3 &p);
 
 	CubeType cubeAt(const math::ivec3 &p) const;
-	int getSunLight(int x, int y) const;
+	CubeType rawCubeAt(const math::ivec3 &p) const;
 	
 	void computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const;
 	

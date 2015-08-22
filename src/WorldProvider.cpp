@@ -1,4 +1,4 @@
-#include "WorldProvider.h"
+#include "WorldProvider.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -114,20 +114,6 @@ WorldProvider::~WorldProvider()
 	sqlite3_finalize(insertChunkSLPStmt);
 	sqlite3_close(db);
 }
-
-/*std::string getFileName(const math::ivec3 &pos)
-{
-	std::ostringstream oss;
-	oss << "world/" << (pos.x > 0 ? "p" : "n") << std::abs(pos.x) << (pos.y > 0 ? "p" : "n") << std::abs(pos.y) << (pos.z > 0 ? "p" : "n") << std::abs(pos.z) << ".wdat";
-	return oss.str();
-}
-
-std::string getSLFileName(const math::ivec3 &pos)
-{
-	std::ostringstream oss;
-	oss << "world/" << (pos.x > 0 ? "p" : "n") << std::abs(pos.x) << (pos.y > 0 ? "p" : "n") << std::abs(pos.y) << (pos.z > 0 ? "p" : "n") << std::abs(pos.z) << ".sldat";
-	return oss.str();
-}*/
 
 bool WorldProvider::save(const Chunk &chunk, const math::ivec3 &pos, bool rewrite)
 {
@@ -308,7 +294,7 @@ void WorldProvider::fill(Chunk &chunk, const math::ivec3 &chunkCoord)
 void WorldProvider::beginTransaction()
 {
 	SqlLiteString errorMsg;
-	sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, &errorMsg.str);
+	sqlite3_exec(db, "BEGIN TRANSACTION", nullptr, nullptr, &errorMsg.str);
 	
 	if (errorMsg.str)
 		std::cout << "Begin transaction error: " << errorMsg.str << std::endl;
@@ -317,7 +303,7 @@ void WorldProvider::beginTransaction()
 void WorldProvider::endTransaction()
 {
 	SqlLiteString errorMsg;
-	sqlite3_exec(db, "END TRANSACTION", NULL, NULL, &errorMsg.str);
+	sqlite3_exec(db, "END TRANSACTION", nullptr, nullptr, &errorMsg.str);
 	
 	if (errorMsg.str)
 		std::cout << "End transaction error: " << errorMsg.str << std::endl;

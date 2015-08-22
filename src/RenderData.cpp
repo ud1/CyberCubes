@@ -1,7 +1,9 @@
 #include <iostream>
 
-#include "RenderData.h"
-#include "colorTransform.h"
+#include "RenderData.hpp"
+#include "colorTransform.hpp"
+#include "Block.hpp"
+#include "blockType.hpp"
 
 struct LightCoefsBlock
 {
@@ -59,8 +61,11 @@ struct LightCoefs
 									++count;
 							}
 
-							constexpr double d = 1.0;
-							count = (count + d) / (1.0 + d / 7.0);
+							if (count < 8)
+							{
+								constexpr double d = 1.0;
+								count = (count + d) / (1.0 + d / 7.0);
+							}
 
 							lblock.multiplier = 1.0f / count / (float)MAX_LIGHT * 255.0;
 						}
@@ -99,13 +104,13 @@ RenderData::~RenderData()
 		glDeleteVertexArrays(1, &vao);
 }
 
-void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk)
+void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk, bool opaque)
 {
 	Vertex vertex;
 	vertex.x = pos.x;
 	vertex.y = pos.y;
 	vertex.z = pos.z;
-	vertex.textureId = textureId;
+	vertex.textureId = textureId + 1;
 
 
 	if (dir == Dir::XN)
@@ -223,7 +228,10 @@ void RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const C
 		colorAt(chunk, math::ivec3(pos.x, pos.y, pos.z + 1), vertex.colorH, vertex.colorS);
 	}
 
-	vertices[(size_t)dir].push_back(vertex);
+	if (opaque)
+		opaqueVertices[(size_t)dir].push_back(vertex);
+	else
+		nonOpaqueVertices[(size_t)dir].push_back(vertex);
 }
 
 template<LightType lt>
@@ -240,8 +248,8 @@ LightValF<lt> RenderData::lightAt(const Chunk &chunk, const math::ivec3 &pos, co
 		{
 			for (int k = 0; k < 2; ++k)
 			{
-				LightVal<lt> l = chunk.lightAt<lt>(math::ivec3(pos.x - i, pos.y - j, pos.z - k));
-				value[1 - i][1 - j][1 - k] = isNotNull< LightVal<lt> >(l);
+				CubeType c = chunk.cubeAt(math::ivec3(pos.x - i, pos.y - j, pos.z - k));
+				value[1 - i][1 - j][1 - k] = isLightTransparent(c);
 			}
 		}
 	}
@@ -289,22 +297,27 @@ void RenderData::uploadData()
 	if (triangleBufferObject == 0)
 		glGenBuffers(1, &triangleBufferObject);
 
-	int size = vertices[0].size()
-               + vertices[1].size()
-               + vertices[2].size()
-               + vertices[3].size()
-               + vertices[4].size()
-               + vertices[5].size();
+	int size = 0;
+	for (int i = 0; i < 6; ++i)
+	{
+		size += opaqueVertices[i].size() + nonOpaqueVertices[i].size();
+	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, triangleBufferObject); //we're "using" this one now
 	glBufferData(GL_ARRAY_BUFFER, size * sizeof(Vertex), NULL, GL_STATIC_DRAW); //formatting the data for the buffer
 	GLintptr offset = 0;
 	for (int i = 0; i < 6; ++i)
 	{
-		if (vertices[i].size() > 0)
+		if (opaqueVertices[i].size() > 0)
 		{
-			glBufferSubData(GL_ARRAY_BUFFER, offset, vertices[i].size() * sizeof(Vertex), &vertices[i][0]);
-			offset += vertices[i].size() * sizeof(Vertex);
+			glBufferSubData(GL_ARRAY_BUFFER, offset, opaqueVertices[i].size() * sizeof(Vertex), &opaqueVertices[i][0]);
+			offset += opaqueVertices[i].size() * sizeof(Vertex);
+		}
+		
+		if (nonOpaqueVertices[i].size() > 0)
+		{
+			glBufferSubData(GL_ARRAY_BUFFER, offset, nonOpaqueVertices[i].size() * sizeof(Vertex), &nonOpaqueVertices[i][0]);
+			offset += nonOpaqueVertices[i].size() * sizeof(Vertex);
 		}
 	}
 
@@ -327,16 +340,15 @@ void RenderData::uploadData()
 
 size_t RenderData::getVideoMemUse() const
 {
-	int size = vertices[0].size()
-               + vertices[1].size()
-               + vertices[2].size()
-               + vertices[3].size()
-               + vertices[4].size()
-               + vertices[5].size();
+	int size = 0;
+	for (int i = 0; i < 6; ++i)
+	{
+		size += opaqueVertices[i].size() + nonOpaqueVertices[i].size();
+	}
 	return size * sizeof(Vertex);
 }
 
-void RenderData::render(GLint normLocation, GLint t1Location, GLint t2Location, const math::vec3 &eye, Tick tick)
+void RenderData::render(GLint normLocation, GLint t1Location, GLint t2Location, const math::vec3 &eye, Tick tick, bool opaque)
 {
 	_renderTick = tick;
 	
@@ -346,67 +358,89 @@ void RenderData::render(GLint normLocation, GLint t1Location, GLint t2Location, 
 	glBindVertexArray(vao);
 
 	int indexOffset = 0;
+	
 	int total = 0;
 	for (int i = 0 ; i < 6; ++i)
 	{
 
-		if (!vertices[i].empty())
+		if (opaque && !opaqueVertices[i].empty() || !opaque && !nonOpaqueVertices[i].empty())
 		{
 			int delta;
 
+			math::vec3 norm, t1, t2;
+		
 			if (i == (int) Dir::XN)
 			{
-				glUniform3f(normLocation, -1.0f, 0.0f, 0.0f);
-				glUniform3f(t1Location, 0.0f, 1.0f, 0.0f);
-				glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
+				norm = math::vec3(-1.0f, 0.0f, 0.0f);
+				t1 = math::vec3(0.0f, 1.0f, 0.0f);
+				t2 = math::vec3(0.0f, 0.0f, 1.0f);
 				delta = eyePos.x;
 			}
 			else if (i == (int) Dir::XP)
 			{
-				glUniform3f(normLocation, 1.0f, 0.0f, 0.0f);
-				glUniform3f(t1Location, 0.0f, 1.0f, 0.0f);
-				glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
+				norm = math::vec3(1.0f, 0.0f, 0.0f);
+				t1 = math::vec3(0.0f, 1.0f, 0.0f);
+				t2 = math::vec3(0.0f, 0.0f, 1.0f);
 				delta = CHUNK_SIZE + 1 - eyePos.x;
 			}
 			else if (i == (int) Dir::YN)
 			{
-				glUniform3f(normLocation, 0.0f, -1.0f, 0.0f);
-				glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
-				glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
+				norm = math::vec3(0.0f, -1.0f, 0.0f);
+				t1 = math::vec3(1.0f, 0.0f, 0.0f);
+				t2 = math::vec3(0.0f, 0.0f, 1.0f);
 				delta = eyePos.y;
 			}
 			else if (i == (int) Dir::YP)
 			{
-				glUniform3f(normLocation, 0.0f, 1.0f, 0.0f);
-				glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
-				glUniform3f(t2Location, 0.0f, 0.0f, 1.0f);
+				norm = math::vec3(0.0f, 1.0f, 0.0f);
+				t1 = math::vec3(1.0f, 0.0f, 0.0f);
+				t2 = math::vec3(0.0f, 0.0f, 1.0f);
 				delta = CHUNK_SIZE + 1 - eyePos.y;
 			}
 			else if (i == (int) Dir::ZN)
 			{
-				glUniform3f(normLocation, 0.0f, 0.0f, -1.0f);
-				glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
-				glUniform3f(t2Location, 0.0f, 1.0f, 0.0f);
+				norm = math::vec3(0.0f, 0.0f, -1.0f);
+				t1 = math::vec3(1.0f, 0.0f, 0.0f);
+				t2 = math::vec3(0.0f, 1.0f, 0.0f);
 				delta = eyePos.z;
 			}
 			else if (i == (int) Dir::ZP)
 			{
-				glUniform3f(normLocation, 0.0f, 0.0f, 1.0f);
-				glUniform3f(t1Location, 1.0f, 0.0f, 0.0f);
-				glUniform3f(t2Location, 0.0f, 1.0f, 0.0f);
+				norm = math::vec3(0.0f, 0.0f, 1.0f);
+				t1 = math::vec3(1.0f, 0.0f, 0.0f);
+				t2 = math::vec3(0.0f, 1.0f, 0.0f);
 				delta = CHUNK_SIZE + 1 - eyePos.z;
 			}
+			
+			if (normLocation >= 0)
+				glUniform3f(normLocation, norm.x, norm.y, norm.z);
+			
+			if (t1Location >= 0)
+				glUniform3f(t1Location, t1.x, t1.y, t1.z);
+			
+			if (t2Location >= 0)
+				glUniform3f(t2Location, t2.x, t2.y, t2.z);
 
-			if (delta < (int) CHUNK_SIZE)
+			if (opaque)
 			{
-				GLsizei count = vertices[i].size() - layerIndices[i][delta];
+				if (delta < (int) CHUNK_SIZE)
+				{
+					GLsizei count = opaqueVertices[i].size() - opaqueLayerIndices[i][delta];
+					total += count;
+					if (count)
+						glDrawArrays(GL_POINTS, indexOffset + opaqueLayerIndices[i][delta], count);
+				}
+			}
+			else
+			{
+
+				GLsizei count = nonOpaqueVertices[i].size();
 				total += count;
 				if (count)
-				glDrawArrays(GL_POINTS, indexOffset + layerIndices[i][delta], count);
+					glDrawArrays(GL_POINTS, indexOffset + opaqueVertices[i].size(), count);
 			}
-
-			indexOffset += vertices[i].size();
 		}
+		indexOffset += opaqueVertices[i].size() + nonOpaqueVertices[i].size();
 	}
 
 	trisRendered = total * 2;
@@ -414,20 +448,34 @@ void RenderData::render(GLint normLocation, GLint t1Location, GLint t2Location, 
 	glBindVertexArray(0);
 }
 
+int getTextureId(CubeType cubeType)
+{
+	int textureId = 0;
+	Block *block = Block::get(cubeType);
+	if (block)
+		textureId = block->textureId;
+	
+	return textureId;
+}
+
 void RenderData::addVertexData(const Chunk &chunk)
 {
 	for (int i = 0 ; i < 6; ++i)
 	{
-		layerIndices[i].clear();
-		vertices[i].clear();
-		layerIndices[i].resize(CHUNK_SIZE);
+		opaqueLayerIndices[i].clear();
+		nonOpaqueLayerIndices[i].clear();
+		opaqueVertices[i].clear();
+		nonOpaqueVertices[i].clear();
+		opaqueLayerIndices[i].resize(CHUNK_SIZE);
+		nonOpaqueLayerIndices[i].resize(CHUNK_SIZE);
 	}
 
 	for (unsigned int i = 0; i < CHUNK_SIZE; ++i)
 	{
 		for (int l = 0 ; l < 6; ++l)
 		{
-			layerIndices[l][i] = vertices[l].size();
+			opaqueLayerIndices[l][i] = opaqueVertices[l].size();
+			nonOpaqueLayerIndices[l][i] = nonOpaqueVertices[l].size();
 		}
 
 		for (unsigned int j = 0; j < CHUNK_SIZE; ++j)
@@ -436,27 +484,27 @@ void RenderData::addVertexData(const Chunk &chunk)
 			{
 				math::ivec3 p = math::ivec3(i, j, k);
 				if (chunk.hasEdge(p, Dir::XN))
-					addFace(p, chunk.cubeAt(p), Dir::XN, *&chunk);
+					addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::XN, chunk, isOpaque(chunk.rawCubeAt(p)));
 
 				p = math::ivec3(CHUNK_SIZE - 1 - i, j, k);
 				if (chunk.hasEdge(p, Dir::XP))
-					addFace(p, chunk.cubeAt(p), Dir::XP, *&chunk);
+					addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::XP, chunk, isOpaque(chunk.rawCubeAt(p)));
 
 				p = math::ivec3(j, i, k);
 				if (chunk.hasEdge(p, Dir::YN))
-					addFace(p, chunk.cubeAt(p), Dir::YN, *&chunk);
+					addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::YN, chunk, isOpaque(chunk.rawCubeAt(p)));
 
 				p = math::ivec3(j, CHUNK_SIZE - 1 - i, k);
 				if (chunk.hasEdge(p, Dir::YP))
-					addFace(p, chunk.cubeAt(p), Dir::YP, *&chunk);
+					addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::YP, chunk, isOpaque(chunk.rawCubeAt(p)));
 
 				p = math::ivec3(j, k, i);
 				if (chunk.hasEdge(p, Dir::ZN))
-					addFace(p, chunk.cubeAt(p), Dir::ZN, *&chunk);
+					addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::ZN, chunk, isOpaque(chunk.rawCubeAt(p)));
 
 				p = math::ivec3(j, k, CHUNK_SIZE - 1 - i);
 				if (chunk.hasEdge(p, Dir::ZP))
-					addFace(p, chunk.cubeAt(p), Dir::ZP, *&chunk);
+					addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::ZP, chunk, isOpaque(chunk.rawCubeAt(p)));
 			}
 		}
 	}

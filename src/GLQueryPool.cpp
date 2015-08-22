@@ -1,4 +1,4 @@
-#include "GLQueryPool.h"
+#include "GLQueryPool.hpp"
 
 namespace cyberCubes {
 	

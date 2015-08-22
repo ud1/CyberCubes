@@ -1,7 +1,7 @@
-#include "World.h"
-#include "Chunk.h"
-#include "RenderData.h"
-#include "Frustum.h"
+#include "World.hpp"
+#include "Chunk.hpp"
+#include "RenderData.hpp"
+#include "Frustum.hpp"
 #include <iostream>
 #include <map>
 #include <unordered_set>
@@ -10,7 +10,8 @@
 #include <cmath>
 #include <libnoise/noise.h>
 #include <boost/timer/timer.hpp>
-#include "Block.h"
+#include "Block.hpp"
+#include "blockType.hpp"
 
 #include <fstream>
 
@@ -39,11 +40,11 @@ struct WorldProviderTransaction
 	WorldProvider &provider;
 };
 
-World::World()
+World::World() : oqShader("oqShader"), worldShaderPass1("worldShaderPass1"), worldShaderPass2("worldShaderPass2")
 {
 	_renderTick = 0;
-	_maxRenderDataMemoryUse = 500 * 1024 * 1024;
-	_maxChunksMemoryUse = 2000 * 1024 * 1024;
+	_maxRenderDataMemoryUse = 700 * 1024 * 1024;
+	_maxChunksMemoryUse = 5000L * 1024L * 1024L;
 	
 	constexpr int W = 100000;
 	minWorldChunkCoord = IntCoord(-W, -W, -W);
@@ -142,18 +143,21 @@ void updateBlockLightVector(Chunk *chunk, const math::ivec3 &p, const math::ivec
 	}
 	else
 	{
-		CubeType cube = chunk->cubeAt(p);
+		CubeType cube = chunk->rawCubeAt(p);
 
 		if (cube)
 		{
 			const Block *block = Block::get(cube);
 
-			if (block->lightValueR)
-				chunk->rawLightRefAt<LIGHT_R>(p) = block->lightValueR;
-			if (block->lightValueG)
-				chunk->rawLightRefAt<LIGHT_G>(p) = block->lightValueG;
-			if (block->lightValueB)
-				chunk->rawLightRefAt<LIGHT_B>(p) = block->lightValueB;
+			if (block)
+			{
+				if (block->lightValueR)
+					chunk->rawLightRefAt<LIGHT_R>(p) = block->lightValueR;
+				if (block->lightValueG)
+					chunk->rawLightRefAt<LIGHT_G>(p) = block->lightValueG;
+				if (block->lightValueB)
+					chunk->rawLightRefAt<LIGHT_B>(p) = block->lightValueB;
+			}
 		}
 		
 		if (chunk->rawLightRefAt<LIGHT_R>(p) > 0 || chunk->rawLightRefAt<LIGHT_G>(p) > 0 || chunk->rawLightRefAt<LIGHT_B>(p) > 0)
@@ -221,7 +225,7 @@ struct ChunkPtrMapAccessor
 
 	CubeType getCubeAt(const math::ivec3 &v)
 	{
-		return getChunk(eucDivChunk(v))->cubeAt(eucModChunk(v));
+		return getChunk(eucDivChunk(v))->rawCubeAt(eucModChunk(v));
 	}
 
 	Chunk *getChunk(const IntCoord &coord)
@@ -276,7 +280,7 @@ void World::_lightChunks()
 						for (int z = CHUNK_SIZE; z -- > 0;)
 						{
 							IntCoord p = IntCoord(x, y, z);
-							if (chunk->cubeAt(p) > 0)
+							if (!isSunFullyTransparent(chunk->rawCubeAt(p)))
 								break;
 							
 							LightValue lv = sunLightAt(z + chunkPos.z);
@@ -296,7 +300,7 @@ void World::_lightChunks()
 						for (int z = CHUNK_SIZE; z -- > 0;)
 						{
 							IntCoord p = IntCoord(x, y, z);
-							if (chunk->cubeAt(p) > 0)
+							if (!isSunFullyTransparent(chunk->rawCubeAt(p)))
 								break;
 							
 							bool addLightSource = false;
@@ -538,7 +542,7 @@ CubeType World::getCubeAt(const math::ivec3 &v)
 	if (!chunk)
 		return 0;
 	
-	return chunk->cubeAt(eucModChunk(v));
+	return chunk->rawCubeAt(eucModChunk(v));
 }
 
 template<LightType lt>
@@ -650,7 +654,7 @@ void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vec
 
 					if (l2 && *l2)
 					{
-						if (*l2 <= l && !a.getCubeAt(adjP))
+						if (*l2 <= l && isLightTransparent(a.getCubeAt(adjP)))
 						{
 							//lout << "DB " << adjP.x << " " << adjP.y << " " << adjP.z << " <-- " << (int) 0 << " | " << p.x << " " << p.y << " " << p.z << std::endl;
 							
@@ -708,7 +712,7 @@ void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vec
 		}
 	}
 
-	std::cout << "ZeroB " << cnt << " " << cnt2 << std::endl;
+	//std::cout << "ZeroB " << cnt << " " << cnt2 << std::endl;
 
 	for (const math::ivec3 & p : removedBlocks)
 	{
@@ -726,7 +730,7 @@ void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vec
 		}
 	}
 
-	std::cout << "lightSources " << lightSources.size() << std::endl;
+	//std::cout << "lightSources " << lightSources.size() << std::endl;
 	cnt = 0;
 	boost::timer::auto_cpu_timer t;
 
@@ -747,7 +751,7 @@ void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vec
 
 					LightValue *l2 = a.template getLightRef<lt>(adjP);
 
-					if (l2 && *l2 < l1 && !a.getCubeAt(adjP))
+					if (l2 && *l2 < l1 && isLightTransparent(a.getCubeAt(adjP)))
 					{
 						//lout << "LS " << adjP.x << " " << adjP.y << " " << adjP.z << " <-- " << (int) l1 << " | " << p.x << " " << p.y << " " << p.z << std::endl;
 						
@@ -774,7 +778,7 @@ void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vec
 		lightSources2.clear();
 	}
 
-	std::cout << "UpdB " << cnt << std::endl;
+	//std::cout << "UpdB " << cnt << std::endl;
 
 	if (updateDirtyFlags)
 	{
@@ -844,7 +848,7 @@ bool World::putBlock(const math::ivec3 &v, CubeType c)
 	Chunk *chunk = getChunk(chuckC);
 	math::ivec3 bp = eucModChunk(v);
 	
-	if (chunk->cubeAt(bp) == c)
+	if (chunk->rawCubeAt(bp) == c)
 		return false;
 	
 	chunk->put(bp, c);
@@ -890,9 +894,9 @@ bool World::putBlock(const math::ivec3 &v, CubeType c)
 		
 		AddedBlockLight lb;
 		lb.position = v;
-		lb.lightColor[LIGHT_R] = block->lightValueR;
-		lb.lightColor[LIGHT_G] = block->lightValueR;
-		lb.lightColor[LIGHT_B] = block->lightValueR;
+		lb.lightColor[LIGHT_R] = block ? block->lightValueR : 0;
+		lb.lightColor[LIGHT_G] = block ? block->lightValueG : 0;
+		lb.lightColor[LIGHT_B] = block ? block->lightValueB : 0;
 		lb.lightColor[LIGHT_SUN] = 0;
 		addedBlocks.push_back(lb);
 		addedSunLightBlocks.push_back(lb);
@@ -1078,7 +1082,8 @@ void World::create()
 	oqShader.buildShaderProgram("oqvs.glsl", "oqfs.glsl");
 	////////////////////////////////////////
 
-	worldShader.buildShaderProgram("wvs.glsl", "wgs.glsl", "wfs.glsl");
+	worldShaderPass1.buildShaderProgram("wvs.glsl", "wgs.glsl", "wfs.glsl");
+	worldShaderPass2.buildShaderProgram("wvs.glsl", "wgs.glsl", "wfs2.glsl");
 }
 
 void World::_linkChunk(Chunk *chunk, const IntCoord &pos)
@@ -1192,7 +1197,7 @@ bool World::isChunkCanBeRendered(const IntCoord &coord, bool ignoreBlockCount) c
 	if (it == chunks.end() || !it->second->isLighted.load() || !it->second->isSunLighted.load())
 		return false;
 	
-	if (!ignoreBlockCount && !it->second->blockCount)
+	if (!ignoreBlockCount && !it->second->opaqueBlockCount && !it->second->nonOpaqueBlockCount)
 		return false;
 	
 	for (int x = -1; x <= 1 ; ++x)
@@ -1230,11 +1235,14 @@ Chunk *World::makeChunkLoadRequest(const IntCoord &coord)
 	return chunk;
 }
 
-void World::render(const Camera &camera, const cyberCubes::Player &player)
+void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks)
 {
 	++_renderTick;
 	
+	glDisable(GL_BLEND);
+	
 	math::mat4 MVP = camera.getVP();
+	math::mat4 MV = camera.getMatrix();
 	math::Frustum frustum;
 	frustum.update(MVP);
 
@@ -1398,10 +1406,16 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 	{
 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 		glDepthMask(GL_TRUE);
-		glUseProgram(worldShader.program);
+		glUseProgram(worldShaderPass1.program);
 
-		if (worldShader.uniforms.count("MVP"))
-			glUniformMatrix4fv(worldShader.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
+		if (worldShaderPass1.uniforms.count("MVP"))
+			glUniformMatrix4fv(worldShaderPass1.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
+		
+		if (worldShaderPass1.uniforms.count("MV"))
+			glUniformMatrix4fv(worldShaderPass1.uniforms["MV"], 1, GL_FALSE, &MV[0][0]);
+		
+		if (worldShaderPass1.uniforms.count("fogFar"))
+			glUniform1f(worldShaderPass1.uniforms["fogFar"], player.getFogFar());
 
 		for (size_t i = n; i < (n + l) && i < visibleChunksVector.size(); ++i)
 		{
@@ -1409,8 +1423,8 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 			{
 				IntCoord &c = visibleChunksVector[i];
 				math::vec3 pos = i2f(c) * CHUNK_SIZE_F;
-				glUniform3fv(worldShader.uniforms["chunkPosition"], 1, &pos[0]);
-				glUniform1f(worldShader.uniforms["dayNightLightCoef"], dayNightLightCoef);
+				glUniform3fv(worldShaderPass1.uniforms["chunkPosition"], 1, &pos[0]);
+				glUniform1f(worldShaderPass1.uniforms["dayNightLightCoef"], dayNightLightCoef);
 
 				Chunk &chunk = *chunks[c];
 				
@@ -1433,8 +1447,14 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 					dirty2++;
 				}
 				
-				rd.render(worldShader.uniforms["norm"], worldShader.uniforms["t1"], worldShader.uniforms["t2"], camera.position - pos, _renderTick);
-				trisRendred += rd.trisRendered;
+				if (chunk.opaqueBlockCount)
+				{
+					rd.render(worldShaderPass1.uniforms["norm"], worldShaderPass1.uniforms["t1"], worldShaderPass1.uniforms["t2"], camera.position - pos, _renderTick, true);
+					trisRendred += rd.trisRendered;
+				}
+				
+				if (chunk.nonOpaqueBlockCount)
+					nonOpaqueChunks.push_back(c);
 			}
 			else
 			{
@@ -1492,6 +1512,8 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glDepthMask(GL_TRUE);
 
+	extern int g_trisRendered ;
+	g_trisRendered = trisRendred;
 	//std::cout << "triangles " << trisRendred << " OQ " << occluded  << "/" << visibleChunksVector.size() << " memUse: " << _getTotalRenderDataMemoryUse()/1024.0/1024.0 << " MB" << std::endl;
 	//std::cout << "Chunk Mem " << chunks.size()*sizeof(Chunk)/1024.0/1024.0 << " MB, " << pendingChunks.size()*sizeof(Chunk)/1024.0/1024.0 << " MB" << std::endl;
 	
@@ -1499,6 +1521,81 @@ void World::render(const Camera &camera, const cyberCubes::Player &player)
 	
 	releaseOldRenderData();
 	_unloadUnusedChunks();
+}
+
+void World::renderPass2(const Camera &camera, const cyberCubes::Player &player, const std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint HSColorTexture)
+{
+	if (!nonOpaqueChunks.size())
+		return;
+	
+	math::mat4 MVP = camera.getVP();
+	math::mat4 MV = camera.getMatrix();
+	
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glBlendFunc(GL_ZERO, GL_SRC_COLOR);
+	//glBlendFunc(GL_ONE, GL_ONE);
+	
+	glUseProgram(worldShaderPass2.program);
+
+	if (worldShaderPass2.uniforms.count("MVP"))
+		glUniformMatrix4fv(worldShaderPass2.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
+		
+	if (worldShaderPass2.uniforms.count("MV"))
+		glUniformMatrix4fv(worldShaderPass2.uniforms["MV"], 1, GL_FALSE, &MV[0][0]);
+	
+	if (worldShaderPass2.uniforms.count("fogFar"))
+		glUniform1f(worldShaderPass2.uniforms["fogFar"], player.getFogFar());
+	
+	if (worldShaderPass2.uniforms.count("lightMultiplier"))
+		glUniform1f(worldShaderPass2.uniforms["lightMultiplier"], lightMultiplier);
+
+	if (worldShaderPass2.uniforms.count("fogColor"))
+		glUniform3fv(worldShaderPass2.uniforms["fogColor"], 1, &fogColor[0]);
+
+			
+	if (worldShaderPass2.uniforms.count("blockSampler"))
+	{
+		glUniform1i(worldShaderPass2.uniforms["blockSampler"], 0);
+		glActiveTexture(GL_TEXTURE0 + 0);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
+	}
+	
+	if (worldShaderPass2.uniforms.count("HSColorSampler"))
+	{
+		glUniform1i(worldShaderPass2.uniforms["HSColorSampler"], 1);
+		glActiveTexture(GL_TEXTURE0 + 1);
+		glBindTexture(GL_TEXTURE_2D, HSColorTexture);
+	}
+	
+	for (const IntCoord &c : nonOpaqueChunks)
+	{
+		math::vec3 pos = i2f(c) * CHUNK_SIZE_F;
+		if (worldShaderPass2.uniforms.count("chunkPosition"))
+			glUniform3fv(worldShaderPass2.uniforms["chunkPosition"], 1, &pos[0]);
+		
+		if (worldShaderPass2.uniforms.count("dayNightLightCoef"))
+			glUniform1f(worldShaderPass2.uniforms["dayNightLightCoef"], dayNightLightCoef);
+		
+		RenderData &rd = *renderData[c];
+		GLint normLocation = -1;
+		GLint t1Location = -1;
+		GLint t2Location = -1;
+		
+		if (worldShaderPass2.uniforms.count("norm"))
+			normLocation = worldShaderPass2.uniforms["norm"];
+		
+		if (worldShaderPass2.uniforms.count("t1"))
+			t1Location = worldShaderPass2.uniforms["t1"];
+		
+		if (worldShaderPass2.uniforms.count("t2"))
+			t2Location = worldShaderPass2.uniforms["t2"];
+		
+		rd.render(normLocation, t1Location, t2Location, camera.position - pos, _renderTick, false);
+	}
+	
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 size_t World::_getTotalRenderDataMemoryUse() const

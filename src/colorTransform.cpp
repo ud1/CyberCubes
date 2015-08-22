@@ -1,4 +1,4 @@
-#include "colorTransform.h"
+#include "colorTransform.hpp"
 #include <cmath>
 
 void rgb_hsi_norm(float R, float G, float B, float &H, float &S, float &I)

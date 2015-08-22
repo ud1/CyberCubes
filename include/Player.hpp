@@ -1,8 +1,8 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include "Math.h"
-#include "Chunk.h"
+#include "Math.hpp"
+#include "Chunk.hpp"
 
 #include <unordered_set>
 
@@ -29,11 +29,17 @@ public:
 	{
 		return position;
 	}
+	
+	float getFogFar() const
+	{
+		return (viewDistance - 0.8f) * CHUNK_SIZE_F;
+	}
 private:
 	math::vec3 position;
 	ChunkPositionSet chunks;
 	
 	World *world;
+	int viewDistance;
 };
 
 }

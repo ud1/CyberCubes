@@ -1,8 +1,8 @@
-#include "Shader.h"
+#include "Shader.hpp"
 
 #include <iostream>
 
-static GLuint createShader(GLenum eShaderType, const char *strShaderFile)
+static GLuint createShader(GLenum eShaderType, const char *strShaderFile, const std::string &shaderName)
 {
 	char shaderSource[4096];
 	char inChar;
@@ -10,13 +10,15 @@ static GLuint createShader(GLenum eShaderType, const char *strShaderFile)
 	int i = 0;
 
 	shaderFile = fopen(strShaderFile, "r");
-	while(fscanf(shaderFile,"%c",&inChar) > 0)
+
+	while (fscanf(shaderFile, "%c", &inChar) > 0)
 	{
 		shaderSource[i++] = inChar; //loading the file's chars into array
 	}
+
 	shaderSource[i - 1] = '\0';
 	fclose(shaderFile);
-	puts(shaderSource); //print to make sure the string is loaded
+	//puts(shaderSource); //print to make sure the string is loaded
 
 	GLuint shader = glCreateShader(eShaderType);
 	const char *ss = shaderSource;
@@ -26,27 +28,39 @@ static GLuint createShader(GLenum eShaderType, const char *strShaderFile)
 
 	GLint status;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+
 	if (status == GL_FALSE)
 	{
 		GLint infoLogLength;
-        	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLogLength);
+		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLogLength);
 
-        	GLchar strInfoLog[4096];
-        	glGetShaderInfoLog(shader, infoLogLength, NULL, strInfoLog);
+		GLchar strInfoLog[4096];
+		glGetShaderInfoLog(shader, infoLogLength, NULL, strInfoLog);
 
 		char strShaderType[16];
-		switch(eShaderType)
+
+		switch (eShaderType)
 		{
-			case GL_VERTEX_SHADER: sprintf(strShaderType, "vertex"); break;
-			case GL_GEOMETRY_SHADER: sprintf(strShaderType, "geometry"); break;
-			case GL_FRAGMENT_SHADER: sprintf(strShaderType, "fragment"); break;
+		case GL_VERTEX_SHADER:
+			sprintf(strShaderType, "vertex");
+			break;
+
+		case GL_GEOMETRY_SHADER:
+			sprintf(strShaderType, "geometry");
+			break;
+
+		case GL_FRAGMENT_SHADER:
+			sprintf(strShaderType, "fragment");
+			break;
 		}
 
-		printf("Compile failure in %s shader:\n%s\n", strShaderType, strInfoLog);
+		std::cout << "Compile failure in " <<  strShaderType << " shader(" << shaderName << "):\n" << strInfoLog << std::endl;
 		return -1;
 	}
 	else
-		puts("Shader compiled sucessfully!");
+	{
+		std::cout << "Shader compiled sucessfully! " << shaderName << std::endl;
+	}
 
 	return shader;
 }
@@ -56,8 +70,8 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *fsPath)
 	GLuint vertexShader;
 	GLuint fragmentShader;
 
-	vertexShader = createShader(GL_VERTEX_SHADER, vsPath);
-	fragmentShader = createShader(GL_FRAGMENT_SHADER, fsPath);
+	vertexShader = createShader(GL_VERTEX_SHADER, vsPath, shaderName);
+	fragmentShader = createShader(GL_FRAGMENT_SHADER, fsPath, shaderName);
 
 	program = glCreateProgram();
 
@@ -69,18 +83,21 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *fsPath)
 	//error checking
 	GLint status;
 	glGetProgramiv(program, GL_LINK_STATUS, &status);
+
 	if (status == GL_FALSE)
-    {
+	{
 		GLint infoLogLength;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLength);
+		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLength);
 
 		GLchar strInfoLog[4096];
 		glGetProgramInfoLog(program, infoLogLength, NULL, strInfoLog);
-		printf("Shader linker failure: %s\n", strInfoLog);
+		std::cout << "Shader linker failure " << shaderName << ": " << strInfoLog << std::endl;
 		return false;
 	}
 	else
-		puts("Shader linked sucessfully!");
+	{
+		std::cout << "Shader linked sucessfully! " << shaderName << std::endl;
+	}
 
 	/*glDetachShader(program, vertexShader);
 	glDetachShader(program, fragmentShader);*/
@@ -88,6 +105,7 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *fsPath)
 	GLint nuni;
 	glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &nuni);
 	char name[256];
+
 	for (GLint i = 0; i < nuni; ++i)
 	{
 		GLint size;
@@ -96,7 +114,7 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *fsPath)
 		glGetActiveUniform(program, i, sizeof(name), NULL, &size, &type, name);
 		GLint location = glGetUniformLocation(program, name);
 		uniforms[name] = location;
-		std::cout << "Shader " << name << " " << location << std::endl;
+		std::cout << "Shader " << shaderName << ": " << name << " " << location << std::endl;
 	}
 
 	return true;
@@ -108,9 +126,9 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *gsPath, const ch
 	GLuint geometryShader;
 	GLuint fragmentShader;
 
-	vertexShader = createShader(GL_VERTEX_SHADER, vsPath);
-	geometryShader = createShader(GL_GEOMETRY_SHADER, gsPath);
-	fragmentShader = createShader(GL_FRAGMENT_SHADER, fsPath);
+	vertexShader = createShader(GL_VERTEX_SHADER, vsPath, shaderName);
+	geometryShader = createShader(GL_GEOMETRY_SHADER, gsPath, shaderName);
+	fragmentShader = createShader(GL_FRAGMENT_SHADER, fsPath, shaderName);
 
 	program = glCreateProgram();
 
@@ -123,18 +141,22 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *gsPath, const ch
 	//error checking
 	GLint status;
 	glGetProgramiv(program, GL_LINK_STATUS, &status);
+
 	if (status == GL_FALSE)
-    {
+	{
 		GLint infoLogLength;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLength);
+		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLength);
 
 		GLchar strInfoLog[4096];
 		glGetProgramInfoLog(program, infoLogLength, NULL, strInfoLog);
-		printf("Shader linker failure: %s\n", strInfoLog);
+		
+		std::cout << "Shader linker failure " << shaderName << ": " << strInfoLog << std::endl;
 		return false;
 	}
 	else
-		puts("Shader linked sucessfully!");
+	{
+		std::cout << "Shader linked sucessfully! " << shaderName << std::endl;
+	}
 
 	/*glDetachShader(program, vertexShader);
 	glDetachShader(program, geometryShader);
@@ -143,6 +165,7 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *gsPath, const ch
 	GLint nuni;
 	glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &nuni);
 	char name[256];
+
 	for (GLint i = 0; i < nuni; ++i)
 	{
 		GLint size;
@@ -151,7 +174,7 @@ bool Shader::buildShaderProgram(const char *vsPath, const char *gsPath, const ch
 		glGetActiveUniform(program, i, sizeof(name), NULL, &size, &type, name);
 		GLint location = glGetUniformLocation(program, name);
 		uniforms[name] = location;
-		std::cout << "Shader " << name << " " << location << std::endl;
+		std::cout << "Shader "<< shaderName << ": " << name << " " << location << std::endl;
 	}
 
 	return true;

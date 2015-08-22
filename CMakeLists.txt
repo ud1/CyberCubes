@@ -8,7 +8,6 @@ endif()
 
 add_executable(cubercubes
 main.cpp
-src/Atlas.cpp
 src/Block.cpp
 src/Camera.cpp
 src/Chunk.cpp
@@ -21,11 +20,14 @@ src/Shader.cpp
 src/World.cpp
 src/WorldProvider.cpp
 src/toluaGen/Block.cpp
+src/Inventory.cpp
+
+ext/nanovg/src/nanovg.c
 )
 
 find_package(Lua51 REQUIRED) 
 
-include_directories(include ${LUA_INCLUDE_DIR})
+include_directories(include ${LUA_INCLUDE_DIR} ext/nanovg/src)
 
 install(TARGETS cubercubes RUNTIME DESTINATION bin)
 
