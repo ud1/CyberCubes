@@ -7,6 +7,7 @@ flat in vec2 fcolor;
 flat in int ftextureId;
 flat in mat2 fglightMat;
 flat in mat2 fslightMat;
+flat in int fnormalIndex;
 
 uniform vec3 norm;
 uniform float fogFar;
@@ -37,9 +38,9 @@ void main()
   
 	vec3 coord = fract(fposition.xyz + vec3(0.5, 0.5, 0.5));
 	vec2 texCoord;
-	if (norm.x != 0)
+	if (fnormalIndex == 0 || fnormalIndex == 1)
 		texCoord = coord.yz;
-	else if (norm.y != 0)
+	else if (fnormalIndex == 2 || fnormalIndex == 3)
 		texCoord = coord.xz;
 	else
 		texCoord = coord.xy;

@@ -55,14 +55,68 @@ block:registerBlock();
 
 block = Block:new();
 block.id = 30000;
-block.name = "glass_orange";
-block.mainTexture = "textures/glass_orange.png";
+block.name = "glass";
+block.mainTexture = "textures/glass.png";
 block:registerBlock();
 
 block = Block:new();
 block.id = 30001;
+block.name = "glass_black";
+block.mainTexture = "textures/glass_black.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30002;
+block.name = "glass_blue";
+block.mainTexture = "textures/glass_blue.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30003;
+block.name = "glass_brown";
+block.mainTexture = "textures/glass_brown.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30004;
+block.name = "glass_cyan";
+block.mainTexture = "textures/glass_cyan.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30005;
+block.name = "glass_gray";
+block.mainTexture = "textures/glass_gray.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30006;
+block.name = "glass_green";
+block.mainTexture = "textures/glass_green.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30007;
 block.name = "glass_light_blue";
 block.mainTexture = "textures/glass_light_blue.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30008;
+block.name = "glass_lime";
+block.mainTexture = "textures/glass_lime.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30009;
+block.name = "glass_magenta";
+block.mainTexture = "textures/glass_magenta.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30010;
+block.name = "glass_orange";
+block.mainTexture = "textures/glass_orange.png";
 block:registerBlock();
 
 print "Configure finish"

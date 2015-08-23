@@ -13,6 +13,7 @@
 struct Vertex
 {
 	signed char x, y, z;
+	unsigned char normalIndex;
 	unsigned char colorH, colorS;
 	int16_t textureId;
 	unsigned char l1, l2, l3, l4;
@@ -25,18 +26,20 @@ struct RenderData
 	
 	std::vector<Vertex> opaqueVertices[6];
 	std::vector<int> opaqueLayerIndices[6];
-	std::vector<Vertex> nonOpaqueVertices[6];
-	std::vector<int> nonOpaqueLayerIndices[6];
+	std::vector<uint16_t> nonOpaqueIndices[8];
+	
+	std::vector<Vertex> nonOpaqueVertices;
 	int trisRendered;
 	
-
-	GLuint vao = 0;
+	GLuint opaqueVao = 0;
+	GLuint nonOpaqueVao = 0;
 	GLuint triangleBufferObject = 0;
+	GLuint indexBufferObject = 0;
 
-	void addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk, bool opaque);
+	size_t addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk, bool opaque);
 	void uploadData();
 	size_t getVideoMemUse() const;
-	void render(GLint normLocation, GLint t1Location, GLint t2Location, const math::vec3 &eye, Tick tick, bool opaque);
+	void render(GLint clipDirLocation, const math::vec3 &eye, Tick tick, bool opaque);
 	void addVertexData(const Chunk &chunk);
 
 	template<LightType lt>

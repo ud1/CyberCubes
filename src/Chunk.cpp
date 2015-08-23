@@ -102,7 +102,7 @@ bool Chunk::hasEdge(const math::ivec3 &p, Dir dir) const
 		++p2.z;
 	
 	CubeType t2 = cubeAt(p2);
-	return !isOpaque(t2);
+	return t2 != t && !isOpaque(t2);
 }
 
 void Chunk::computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const

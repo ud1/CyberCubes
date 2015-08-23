@@ -663,31 +663,31 @@ int main()
 		}
 
 		if (pressedKeys.count(SDLK_1))
-			blockType = 30001;
+			blockType = 30009;
 
 		if (pressedKeys.count(SDLK_2))
-			blockType = 2;
+			blockType = 30010;
 
 		if (pressedKeys.count(SDLK_3))
-			blockType = 3;
+			blockType = 30002;
 		
 		if (pressedKeys.count(SDLK_4))
-			blockType = 4;
+			blockType = 30003;
 		
 		if (pressedKeys.count(SDLK_5))
-			blockType = 5;
+			blockType = 30004;
 		
 		if (pressedKeys.count(SDLK_6))
-			blockType = 6;
+			blockType = 30005;
 		
 		if (pressedKeys.count(SDLK_7))
-			blockType = 7;
+			blockType = 30006;
 		
 		if (pressedKeys.count(SDLK_8))
-			blockType = 8;
+			blockType = 30007;
 		
 		if (pressedKeys.count(SDLK_9))
-			blockType = 30000;
+			blockType = 30008;
 
 		if (pressedKeys.count(SDLK_e))
 			inventoryShow = !inventoryShow;
@@ -860,8 +860,8 @@ int main()
 		glDisable(GL_BLEND);
 		glDisable(GL_SCISSOR_TEST);
 		
-		world.dayNightLightCoef = (1.0 + std::cos(globalT / 20.0))/2.0;
-		//world.dayNightLightCoef = 1.0f;
+		//world.dayNightLightCoef = (1.0 + std::cos(globalT / 20.0))/2.0;
+		world.dayNightLightCoef = 1.0f;
 		//std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
 
 		std::vector<IntCoord> nonOpaqueChunks;

@@ -629,7 +629,7 @@ void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vec
 
 	for (const math::ivec3 & blockCoord : newDarkBlocks)
 	{
-		boost::timer::auto_cpu_timer t;
+		//boost::timer::auto_cpu_timer t;
 
 		LightValue *lp = a.template getLightRef<lt>(blockCoord);
 
@@ -732,7 +732,7 @@ void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vec
 
 	//std::cout << "lightSources " << lightSources.size() << std::endl;
 	cnt = 0;
-	boost::timer::auto_cpu_timer t;
+	//boost::timer::auto_cpu_timer t;
 
 	std::unordered_set<math::ivec3, IntCoordHasher> lightSources2;
 
@@ -1083,7 +1083,7 @@ void World::create()
 	////////////////////////////////////////
 
 	worldShaderPass1.buildShaderProgram("wvs.glsl", "wgs.glsl", "wfs.glsl");
-	worldShaderPass2.buildShaderProgram("wvs.glsl", "wgs.glsl", "wfs2.glsl");
+	worldShaderPass2.buildShaderProgram("wvs.glsl", "wgs2.glsl", "wfs2.glsl");
 }
 
 void World::_linkChunk(Chunk *chunk, const IntCoord &pos)
@@ -1449,7 +1449,7 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 				
 				if (chunk.opaqueBlockCount)
 				{
-					rd.render(worldShaderPass1.uniforms["norm"], worldShaderPass1.uniforms["t1"], worldShaderPass1.uniforms["t2"], camera.position - pos, _renderTick, true);
+					rd.render(-1, camera.position - pos, _renderTick, true);
 					trisRendred += rd.trisRendered;
 				}
 				
@@ -1537,6 +1537,10 @@ void World::renderPass2(const Camera &camera, const cyberCubes::Player &player, 
 	//glBlendFunc(GL_ZERO, GL_SRC_COLOR);
 	//glBlendFunc(GL_ONE, GL_ONE);
 	
+	glEnable(GL_CLIP_DISTANCE0 + 0);
+	glEnable(GL_CLIP_DISTANCE0 + 1);
+	glEnable(GL_CLIP_DISTANCE0 + 2);
+	
 	glUseProgram(worldShaderPass2.program);
 
 	if (worldShaderPass2.uniforms.count("MVP"))
@@ -1553,6 +1557,9 @@ void World::renderPass2(const Camera &camera, const cyberCubes::Player &player, 
 
 	if (worldShaderPass2.uniforms.count("fogColor"))
 		glUniform3fv(worldShaderPass2.uniforms["fogColor"], 1, &fogColor[0]);
+	
+	if (worldShaderPass2.uniforms.count("eyePos"))
+		glUniform3fv(worldShaderPass2.uniforms["eyePos"], 1, &camera.position[0]);
 
 			
 	if (worldShaderPass2.uniforms.count("blockSampler"))
@@ -1569,8 +1576,22 @@ void World::renderPass2(const Camera &camera, const cyberCubes::Player &player, 
 		glBindTexture(GL_TEXTURE_2D, HSColorTexture);
 	}
 	
-	for (const IntCoord &c : nonOpaqueChunks)
+	GLint clipDirLocation = -1;
+	if (worldShaderPass2.uniforms.count("clipDir"))
+		clipDirLocation = worldShaderPass2.uniforms["clipDir"];
+	
+	std::multimap<float, IntCoord> playerChunks;
+	for (const IntCoord &coord : nonOpaqueChunks)
 	{
+		math::vec3 d = i2f(coord)*CHUNK_SIZE_F + math::vec3(CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f) - player.getPosition();
+		float dist = math::length(d);
+		playerChunks.insert(std::make_pair(-dist, coord));
+	}
+	
+	for (std::multimap<float, IntCoord>::iterator it = playerChunks.begin(); it != playerChunks.end(); ++it)
+	{
+		IntCoord c = it->second;
+		
 		math::vec3 pos = i2f(c) * CHUNK_SIZE_F;
 		if (worldShaderPass2.uniforms.count("chunkPosition"))
 			glUniform3fv(worldShaderPass2.uniforms["chunkPosition"], 1, &pos[0]);
@@ -1579,23 +1600,13 @@ void World::renderPass2(const Camera &camera, const cyberCubes::Player &player, 
 			glUniform1f(worldShaderPass2.uniforms["dayNightLightCoef"], dayNightLightCoef);
 		
 		RenderData &rd = *renderData[c];
-		GLint normLocation = -1;
-		GLint t1Location = -1;
-		GLint t2Location = -1;
-		
-		if (worldShaderPass2.uniforms.count("norm"))
-			normLocation = worldShaderPass2.uniforms["norm"];
-		
-		if (worldShaderPass2.uniforms.count("t1"))
-			t1Location = worldShaderPass2.uniforms["t1"];
-		
-		if (worldShaderPass2.uniforms.count("t2"))
-			t2Location = worldShaderPass2.uniforms["t2"];
-		
-		rd.render(normLocation, t1Location, t2Location, camera.position - pos, _renderTick, false);
+		rd.render(clipDirLocation, camera.position - pos, _renderTick, false);
 	}
 	
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_CLIP_DISTANCE0 + 0);
+	glDisable(GL_CLIP_DISTANCE0 + 1);
+	glDisable(GL_CLIP_DISTANCE0 + 2);
 }
 
 size_t World::_getTotalRenderDataMemoryUse() const

@@ -5,6 +5,8 @@ layout(triangle_strip, max_vertices = 6) out;
 
 uniform mat4 MVP;
 uniform mat4 MV;
+uniform vec3 eyePos;
+uniform vec3 clipDir;
 //uniform vec3 norm, t1, t2;
 in vec4 glight[];
 in vec4 slight[];
@@ -37,6 +39,9 @@ void main() {
   fnormalIndex = gnormalIndex[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   viewSpace = MV * vec4(fposition.xyz, 1);
+  gl_ClipDistance[0] = (fposition.x - eyePos.x) * clipDir.x;
+  gl_ClipDistance[1] = (fposition.y - eyePos.y) * clipDir.y;
+  gl_ClipDistance[2] = (fposition.z - eyePos.z) * clipDir.z;
   EmitVertex();
 
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 - 0.5 * t2, glight[0].y);
@@ -47,6 +52,9 @@ void main() {
   fnormalIndex = gnormalIndex[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   viewSpace = MV * vec4(fposition.xyz, 1);
+  gl_ClipDistance[0] = (fposition.x - eyePos.x) * clipDir.x;
+  gl_ClipDistance[1] = (fposition.y - eyePos.y) * clipDir.y;
+  gl_ClipDistance[2] = (fposition.z - eyePos.z) * clipDir.z;
   EmitVertex();
   
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 + 0.5 * t2, glight[0].z);
@@ -57,6 +65,9 @@ void main() {
   fnormalIndex = gnormalIndex[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   viewSpace = MV * vec4(fposition.xyz, 1);
+  gl_ClipDistance[0] = (fposition.x - eyePos.x) * clipDir.x;
+  gl_ClipDistance[1] = (fposition.y - eyePos.y) * clipDir.y;
+  gl_ClipDistance[2] = (fposition.z - eyePos.z) * clipDir.z;
   EmitVertex();
   
   EndPrimitive();
@@ -69,6 +80,9 @@ void main() {
   fnormalIndex = gnormalIndex[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   viewSpace = MV * vec4(fposition.xyz, 1);
+  gl_ClipDistance[0] = (fposition.x - eyePos.x) * clipDir.x;
+  gl_ClipDistance[1] = (fposition.y - eyePos.y) * clipDir.y;
+  gl_ClipDistance[2] = (fposition.z - eyePos.z) * clipDir.z;
   EmitVertex();
   
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 + 0.5 * t2, glight[0].z);
@@ -79,6 +93,9 @@ void main() {
   fnormalIndex = gnormalIndex[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   viewSpace = MV * vec4(fposition.xyz, 1);
+  gl_ClipDistance[0] = (fposition.x - eyePos.x) * clipDir.x;
+  gl_ClipDistance[1] = (fposition.y - eyePos.y) * clipDir.y;
+  gl_ClipDistance[2] = (fposition.z - eyePos.z) * clipDir.z;
   EmitVertex();
   
   fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 + 0.5 * t2, glight[0].w);
@@ -89,6 +106,9 @@ void main() {
   fnormalIndex = gnormalIndex[0];
   gl_Position = MVP * vec4(fposition.xyz, 1);
   viewSpace = MV * vec4(fposition.xyz, 1);
+  gl_ClipDistance[0] = (fposition.x - eyePos.x) * clipDir.x;
+  gl_ClipDistance[1] = (fposition.y - eyePos.y) * clipDir.y;
+  gl_ClipDistance[2] = (fposition.z - eyePos.z) * clipDir.z;
   EmitVertex();
 
   EndPrimitive();
