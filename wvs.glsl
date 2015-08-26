@@ -8,18 +8,17 @@ layout(location = 5) in vec4 sunLight;
 
 uniform vec3 chunkPosition;
 uniform float dayNightLightCoef;
-out int gtextureId;
+
 out vec4 glight;
 out vec4 slight;
 out vec2 gcolor;
+out int gtextureId;
 out int gnormalIndex;
-
-uniform mat4 MVP;
 
 void main()
 {
 	gl_Position = vec4(position.xyz + chunkPosition, 1);
-	gtextureId = int(textureId);
+	gtextureId = textureId;
 	slight = sunLight * dayNightLightCoef;
 	glight = light;
 	gcolor = color;

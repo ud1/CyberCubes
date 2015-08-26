@@ -6,7 +6,7 @@ namespace cyberCubes {
 Player::Player(World *world_)
 {
 	world = world_;
-	viewDistance = 5;
+	viewDistance = 6;
 }
 
 Player::~Player()

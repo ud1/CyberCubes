@@ -461,23 +461,24 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 	{
 		for (int k = 0; k < 8; ++k)
 		{
-			math::vec3 clipDir;
-			if (k == 0)
-				clipDir = math::vec3(1, 1, 1);
-			else if (k == 1)
-				clipDir = math::vec3(-1, 1, 1);
-			else if (k == 2)
-				clipDir = math::vec3(1, -1, 1);
-			else if (k == 3)
-				clipDir = math::vec3(-1, -1, 1);
-			else if (k == 4)
-				clipDir = math::vec3(1, 1, -1);
-			else if (k == 5)
-				clipDir = math::vec3(-1, 1, -1);
-			else if (k == 6)
-				clipDir = math::vec3(1, -1, -1);
-			else
-				clipDir = math::vec3(-1, -1, -1);
+			bool xp = (k & 1);
+			bool yp = (k & 2);
+			bool zp = (k & 4);
+			
+			if (xp && eye.x < 0.0f)
+				continue;
+			if (yp && eye.y < 0.0f)
+				continue;
+			if (zp && eye.z < 0.0f)
+				continue;
+			if (!xp && eye.x > CHUNK_SIZE_F)
+				continue;
+			if (!yp && eye.y > CHUNK_SIZE_F)
+				continue;
+			if (!zp && eye.z > CHUNK_SIZE_F)
+				continue;
+			
+			math::vec3 clipDir = math::vec3(xp ? -1 : 1, yp ? -1 : 1, zp ? -1 : 1);
 			
 			int indexStart = 0;
 			for (int i = 0; i < k; ++i)

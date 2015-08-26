@@ -1,36 +1,32 @@
 #version 330
 
-layout(location = 0) out vec4 outputColor;
-layout(location = 1) out vec4 outputLight;
-layout(location = 2) out int outputMaterial;
-in vec4 fposition;
+layout(location = 0) out vec4 outputData1;
+layout(location = 1) out vec4 outputData2;
+layout(location = 2) out vec4 outputData3;
+layout(location = 3) out int outputMaterial;
 in vec4 viewSpace;
+in vec2 texCoord;
 flat in vec2 fcolor;
 flat in int ftextureId;
 flat in mat2 fglightMat;
 flat in mat2 fslightMat;
-flat in int fnormalIndex;
 
 uniform vec3 norm;
 uniform float fogFar;
 
 void main()
 {
-  float dist = length(viewSpace);
-  float fogFactor = (fogFar - dist)/(fogFar - 3*fogFar/4);
-  fogFactor = clamp( fogFactor, 0.0, 1.0 );
-  vec3 coord = fract(fposition.xyz + vec3(0.5, 0.5, 0.5));
-  float texCount = 2;
-  
-  if (fnormalIndex == 0 || fnormalIndex == 1)
-    outputColor = vec4(fogFactor, coord.yz, texCount);
-  else if (fnormalIndex == 2 || fnormalIndex == 3)
-    outputColor = vec4(fogFactor, coord.xz, texCount);
-  else
-    outputColor = vec4(fogFactor, coord.xy, texCount);
-  
-  outputMaterial = ftextureId;
-  float slight = dot(vec2(1 - outputColor.y, outputColor.y), fslightMat * vec2(1 - outputColor.z, outputColor.z));
-  float glight = dot(vec2(1 - outputColor.y, outputColor.y), fglightMat * vec2(1 - outputColor.z, outputColor.z));
-  outputLight = vec4(glight, slight, fcolor);
+	float dist = length(viewSpace);
+	float fogFactor = (fogFar - dist)/(fogFar - 3*fogFar/4);
+	fogFactor = clamp( fogFactor, 0.0, 1.0 );
+	
+	vec2 r1 = vec2(1 - texCoord.x, texCoord.x);
+	vec2 r2 = vec2(1 - texCoord.y, texCoord.y);
+	float slight = dot(r1, fslightMat * r2);
+	float glight = dot(r1, fglightMat * r2);
+	
+	outputData1 = vec4(fogFactor, texCoord, 0);
+	outputData2 = vec4(glight, slight, fcolor);
+	outputData3 = vec4(dFdx(texCoord), dFdy(texCoord));
+	outputMaterial = ftextureId;
 }

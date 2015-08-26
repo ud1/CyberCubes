@@ -5,110 +5,75 @@ layout(triangle_strip, max_vertices = 6) out;
 
 uniform mat4 MVP;
 uniform mat4 MV;
-//uniform vec3 norm, t1, t2;
 in vec4 glight[];
 in vec4 slight[];
 in vec2 gcolor[];
 in int gtextureId[];
 in int gnormalIndex[];
 
-out vec4 fposition;
 out vec4 viewSpace;
+out vec2 texCoord;
 flat out vec2 fcolor;
 flat out int ftextureId;
 flat out mat2 fglightMat;
 flat out mat2 fslightMat;
-flat out int fnormalIndex;
 
-const vec3 normals[6] = vec3[6](vec3(-1, 0, 0), vec3(1, 0, 0), vec3(0, -1, 0), vec3(0, 1, 0), vec3(0, 0, -1), vec3(0, 0, 1));
-const vec3 t1s[6]     = vec3[6](vec3(0, 1, 0), vec3(0, 1, 0), vec3(1, 0, 0), vec3(1, 0, 0), vec3(1, 0, 0), vec3(1, 0, 0));
-const vec3 t2s[6]     = vec3[6](vec3(0, 0, 1), vec3(0, 0, 1), vec3(0, 0, 1), vec3(0, 0, 1), vec3(0, 1, 0), vec3(0, 1, 0));
+const vec3 normals[6] = vec3[6](vec3(-0.5, 0, 0), vec3(0.5, 0, 0), vec3(0, -0.5, 0), vec3(0, 0.5, 0), vec3(0, 0, -0.5), vec3(0, 0, 0.5));
+const vec3 t1s[6]     = vec3[6](vec3(0, 0.5, 0), vec3(0, 0.5, 0), vec3(0.5, 0, 0), vec3(0.5, 0, 0), vec3(0.5, 0, 0), vec3(0.5, 0, 0));
+const vec3 t2s[6]     = vec3[6](vec3(0, 0, 0.5), vec3(0, 0, 0.5), vec3(0, 0, 0.5), vec3(0, 0, 0.5), vec3(0, 0.5, 0), vec3(0, 0.5, 0));
 
 void main() {
-  vec3 norm = normals[gnormalIndex[0]];
-  vec3 t1 = t1s[gnormalIndex[0]];
-  vec3 t2 = t2s[gnormalIndex[0]];
-  
-  fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 - 0.5 * t2, glight[0].x);
-  fcolor = vec2(gcolor[0].x, gcolor[0].y);
-  fglightMat = mat2(glight[0].x, glight[0].y, glight[0].z, glight[0].w);
-  fslightMat = mat2(slight[0].x, slight[0].y, slight[0].z, slight[0].w);
-  ftextureId = gtextureId[0];
-  fnormalIndex = gnormalIndex[0];
-  gl_Position = MVP * vec4(fposition.xyz, 1);
-  viewSpace = MV * vec4(fposition.xyz, 1);
-  EmitVertex();
+	vec3 norm = normals[gnormalIndex[0]];
+	vec3 t1 = t1s[gnormalIndex[0]];
+	vec3 t2 = t2s[gnormalIndex[0]];
+	vec3 p1 = gl_in[0].gl_Position.xyz + norm;
+	vec3 fposition1 = p1 - t1 - t2;
+	vec3 fposition2 = p1 + t1 - t2;
+	vec3 fposition3 = p1 - t1 + t2;
+	vec3 fposition4 = p1 + t1 + t2;
+	
+	vec4 glPos2 = MVP * vec4(fposition2, 1);
+	vec4 viewSpace2 = MV * vec4(fposition2, 1);
+	
+	vec4 glPos3 = MVP * vec4(fposition3, 1);
+	vec4 viewSpace3 = MV * vec4(fposition3, 1);
 
-  fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 - 0.5 * t2, glight[0].y);
-  fcolor = vec2(gcolor[0].x, gcolor[0].y);
-  fglightMat = mat2(glight[0].x, glight[0].y, glight[0].z, glight[0].w);
-  fslightMat = mat2(slight[0].x, slight[0].y, slight[0].z, slight[0].w);
-  ftextureId = gtextureId[0];
-  fnormalIndex = gnormalIndex[0];
-  gl_Position = MVP * vec4(fposition.xyz, 1);
-  viewSpace = MV * vec4(fposition.xyz, 1);
-  EmitVertex();
-  
-  fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 + 0.5 * t2, glight[0].z);
-  fcolor = vec2(gcolor[0].x, gcolor[0].y);
-  fglightMat = mat2(glight[0].x, glight[0].y, glight[0].z, glight[0].w);
-  fslightMat = mat2(slight[0].x, slight[0].y, slight[0].z, slight[0].w);
-  ftextureId = gtextureId[0];
-  fnormalIndex = gnormalIndex[0];
-  gl_Position = MVP * vec4(fposition.xyz, 1);
-  viewSpace = MV * vec4(fposition.xyz, 1);
-  EmitVertex();
-  
-  EndPrimitive();
+	texCoord = vec2(0, 0);
+	fcolor = gcolor[0];
+	fglightMat = mat2(glight[0]);
+	fslightMat = mat2(slight[0]);
+	ftextureId = gtextureId[0];
+	
+	gl_Position = MVP * vec4(fposition1, 1);
+	viewSpace = MV * vec4(fposition1, 1);
+	EmitVertex();
 
-  fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 - 0.5 * t2, glight[0].y);
-  fcolor = vec2(gcolor[0].x, gcolor[0].y);
-  fglightMat = mat2(glight[0].x, glight[0].y, glight[0].z, glight[0].w);
-  fslightMat = mat2(slight[0].x, slight[0].y, slight[0].z, slight[0].w);
-  ftextureId = gtextureId[0];
-  fnormalIndex = gnormalIndex[0];
-  gl_Position = MVP * vec4(fposition.xyz, 1);
-  viewSpace = MV * vec4(fposition.xyz, 1);
-  EmitVertex();
-  
-  fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm - 0.5 * t1 + 0.5 * t2, glight[0].z);
-  fcolor = vec2(gcolor[0].x, gcolor[0].y);
-  fglightMat = mat2(glight[0].x, glight[0].y, glight[0].z, glight[0].w);
-  fslightMat = mat2(slight[0].x, slight[0].y, slight[0].z, slight[0].w);
-  ftextureId = gtextureId[0];
-  fnormalIndex = gnormalIndex[0];
-  gl_Position = MVP * vec4(fposition.xyz, 1);
-  viewSpace = MV * vec4(fposition.xyz, 1);
-  EmitVertex();
-  
-  fposition = vec4(gl_in[0].gl_Position.xyz + 0.5 * norm + 0.5 * t1 + 0.5 * t2, glight[0].w);
-  fcolor = vec2(gcolor[0].x, gcolor[0].y);
-  fglightMat = mat2(glight[0].x, glight[0].y, glight[0].z, glight[0].w);
-  fslightMat = mat2(slight[0].x, slight[0].y, slight[0].z, slight[0].w);
-  ftextureId = gtextureId[0];
-  fnormalIndex = gnormalIndex[0];
-  gl_Position = MVP * vec4(fposition.xyz, 1);
-  viewSpace = MV * vec4(fposition.xyz, 1);
-  EmitVertex();
+	texCoord = vec2(1, 0);
+	gl_Position = glPos2;
+	viewSpace = viewSpace2;
+	EmitVertex();
+	
+	texCoord = vec2(0, 1);
+	gl_Position = glPos3;
+	viewSpace = viewSpace3;
+	EmitVertex();
+	
+	EndPrimitive();
 
-  EndPrimitive();
+	texCoord = vec2(1, 0);
+	gl_Position = glPos2;
+	viewSpace = viewSpace2;
+	EmitVertex();
+	
+	texCoord = vec2(0, 1);
+	gl_Position = glPos3;
+	viewSpace = viewSpace3;
+	EmitVertex();
+	
+	texCoord = vec2(1, 1);
+	gl_Position = MVP * vec4(fposition4, 1);
+	viewSpace = MV * vec4(fposition4, 1);
+	EmitVertex();
+
+	EndPrimitive();
 } 
-
-
-/*layout(points) in;
-layout(triangle_strip, max_vertices = 3) out;
-uniform mat4 MVP;
-
-void main() {
-  gl_Position = MVP * vec4(gl_in[0].gl_Position.xyz, 1);
-  //gl_Position = vec4(0.0, 0.0, 0.5, 5);
-  EmitVertex();
-  
-  gl_Position = MVP * vec4(gl_in[0].gl_Position.xyz + vec3(0.5, 1.0, 0.0), 1);
-  EmitVertex();
-  
-  gl_Position = MVP * vec4(gl_in[0].gl_Position.xyz + vec3(1.0, 0.5, 0.0), 1);
-  EmitVertex();
-  EndPrimitive();
-} */
-
