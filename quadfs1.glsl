@@ -16,16 +16,16 @@ void main()
 {
 	vec2 c = textureSize(frameBufferTexture1, 0)*(fposition.xy + vec2(1,1)) / 2;
 	
+	int materialId = texture(materialSampler, c).r;
+	
+	if (materialId == 0)
+		discard;
+		
 	vec3 data1 = texture(frameBufferTexture1, c).rgb;
 	float fogFactor = data1.r;
 	vec2 texCoord = data1.gb;
 	
 	vec4 ddxy = texture(frameBufferTexture3, c);
-	
-	int materialId = texture(materialSampler, c).r;
-	
-	if (materialId == 0)
-		discard;
 	
 	vec4 colorData = texture(frameBufferTexture2, c);
 	vec3 sun_color = vec3(1, 1, 1) * (pow(0.02, 1.0 - colorData.y) - 0.02*(1.0 - colorData.y));

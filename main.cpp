@@ -245,6 +245,69 @@ namespace
 	bool inventoryShow = false;
 	
 	Camera camera;
+	
+	GLuint crosshairVao = 0;
+	GLuint crosshairBufferObject = 0;
+	Shader crosshairShader("crosshairShader");
+	
+	bool renderHighlight;
+}
+
+void renderCrosshair(SDL_Window *window)
+{
+	int w, h;
+	SDL_GetWindowSize(window, &w, &h);
+	
+	float fw = w;
+	float fh = h;
+	float HW = 1;
+	float HH = 10;
+	
+	std::vector<math::vec2> coords;
+	coords.push_back(math::vec2(-HW + fw/2.0f, HH + fh/2.0f));
+	coords.push_back(math::vec2(-HW + fw/2.0f, -HH + fh/2.0f));
+	coords.push_back(math::vec2(HW + fw/2.0f, -HH + fh/2.0f));
+	
+	coords.push_back(math::vec2(-HW + fw/2.0f, HH + fh/2.0f));
+	coords.push_back(math::vec2(HW + fw/2.0f, -HH + fh/2.0f));
+	coords.push_back(math::vec2(HW + fw/2.0f, HH + fh/2.0f));
+	
+	coords.push_back(math::vec2(-HH + fw/2.0f, HW + fh/2.0f));
+	coords.push_back(math::vec2(-HH + fw/2.0f, -HW + fh/2.0f));
+	coords.push_back(math::vec2(HH + fw/2.0f, -HW + fh/2.0f));
+	
+	coords.push_back(math::vec2(-HH + fw/2.0f, HW + fh/2.0f));
+	coords.push_back(math::vec2(HH + fw/2.0f, -HW + fh/2.0f));
+	coords.push_back(math::vec2(HH + fw/2.0f, HW + fh/2.0f));
+	
+	glBindBuffer(GL_ARRAY_BUFFER, crosshairBufferObject);
+	glBufferData(GL_ARRAY_BUFFER, coords.size() * sizeof(math::vec2), coords.data(), GL_STREAM_DRAW);
+	checkGLError("10_2");
+	
+	glBindVertexArray(crosshairVao);
+	checkGLError("10_1");
+	
+	glEnable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+	
+	glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
+	
+	glUseProgram(crosshairShader.program);
+
+	if (crosshairShader.uniforms.count("MVP"))
+	{
+		math::mat4 MVP = math::ortho(0.0f, fw, 0.0f, fh);
+		
+		glUniformMatrix4fv(crosshairShader.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
+	}
+	
+	checkGLError("10_0");
+	
+	glDrawArrays(GL_TRIANGLES, 0, coords.size());
+	
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	
+	checkGLError("10");
 }
 
 int main()
@@ -337,6 +400,20 @@ int main()
 		SDL_Quit();
 		return 0;
 	}
+	
+	Shader highlightSideShader("highlightSideShader");
+
+	if (!highlightSideShader.buildShaderProgram("highlightSidevs.glsl", "highlightSidegs.glsl", "highlightSidefs.glsl"))
+	{
+		SDL_Quit();
+		return 0;
+	}
+	
+	if (!crosshairShader.buildShaderProgram("crosshairShadervs.glsl", "crosshairShaderfs.glsl"))
+	{
+		SDL_Quit();
+		return 0;
+	}
 
 	camera.position = math::vec3(0.0f, 0.0f, 300.0f);
 	camera.aspectRatio = (float) width / (float) height;
@@ -370,7 +447,7 @@ int main()
 	GLuint	frameBufferTexture1;
 	glGenTextures(1, &frameBufferTexture1);
 	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture1);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture1, 0);
@@ -378,7 +455,7 @@ int main()
 	GLuint	frameBufferTexture2;
 	glGenTextures(1, &frameBufferTexture2);
 	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture2);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
@@ -386,7 +463,7 @@ int main()
 	GLuint	frameBufferTexture3;
 	glGenTextures(1, &frameBufferTexture3);
 	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture3);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_RECTANGLE, frameBufferTexture3, 0);
@@ -420,7 +497,7 @@ int main()
 	GLuint	frameBufferFinalTexture;
 	glGenTextures(1, &frameBufferFinalTexture);
 	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferFinalTexture);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
@@ -430,7 +507,7 @@ int main()
 	const int MAX_BLOCK_TYPES = 40000;
 	std::map<int, SDL_Surface *> images;
 	std::map<std::string, int> textureNameIdMap;
-
+	
 	for (int type = 0; type < MAX_BLOCK_TYPES; ++type)
 	{
 		Block *block = Block::get(type);
@@ -563,6 +640,18 @@ int main()
 
 	GLuint wireframeCubeVao = 0;
 	glGenVertexArrays(1, &wireframeCubeVao);
+	
+	GLuint higlightSideVao = 0;
+	glGenVertexArrays(1, &higlightSideVao);
+	
+	glGenVertexArrays(1, &crosshairVao);
+	glGenBuffers(1, &crosshairBufferObject);
+
+	glBindVertexArray(crosshairVao);
+	glBindBuffer(GL_ARRAY_BUFFER, crosshairBufferObject);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(math::vec2), 0);
+	glBindVertexArray(0);
 
 	bool pause = false;
 
@@ -1009,6 +1098,8 @@ int main()
 			glBindTexture(GL_TEXTURE_1D, 0);
 
 			checkGLError("8");
+			
+			
 
 			{
 				math::vec3 dir = camera.transform(1.0f, 0.0f, 0.0f);
@@ -1043,17 +1134,70 @@ int main()
 					}
 
 					glLineWidth(2.0f);
+					glDepthMask(GL_TRUE);
 					glDrawArrays(GL_POINTS, 0, 1);
-
-					if (wireframeBox.uniforms.count("position"))
+					glDepthMask(GL_FALSE);
+				}
+				
+				world.renderPass2(camera, player, nonOpaqueChunks, blockTexture, HSColorTexture);
+				
+				if (b)
+				{
+					if (renderHighlight)
 					{
-						math::vec3 pos = (math::vec3) prevBPos;
-						glUniform3fv(wireframeBox.uniforms["position"], 1, &pos[0]);
+						glBindVertexArray(higlightSideVao);
+						checkGLError("9_1");
+						glUseProgram(highlightSideShader.program);
+						glEnable(GL_DEPTH_TEST);
+						if (highlightSideShader.uniforms.count("MVP"))
+						{
+							math::mat4 MVP = camera.getVP();
+							glUniformMatrix4fv(highlightSideShader.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
+						}
+						
+						if (highlightSideShader.uniforms.count("position"))
+						{
+							math::vec3 pos = (math::vec3) prevBPos;
+							glUniform3fv(highlightSideShader.uniforms["position"], 1, &pos[0]);
+						}
+						
+						int normalIndex = 0;
+						if (bpos.x > prevBPos.x)
+							normalIndex = (int) Dir::XP;
+						else if (bpos.x < prevBPos.x)
+							normalIndex = (int) Dir::XN;
+						else if (bpos.y > prevBPos.y)
+							normalIndex = (int) Dir::YP;
+						else if (bpos.y < prevBPos.y)
+							normalIndex = (int) Dir::YN;
+						else if (bpos.z > prevBPos.z)
+							normalIndex = (int) Dir::ZP;
+						else if (bpos.z < prevBPos.z)
+							normalIndex = (int) Dir::ZN;
+						
+						if (highlightSideShader.uniforms.count("normalIndex"))
+						{
+							glUniform1i(highlightSideShader.uniforms["normalIndex"], normalIndex);
+						}
+						
+						if (highlightSideShader.uniforms.count("blockSampler"))
+						{
+							glUniform1i(highlightSideShader.uniforms["blockSampler"], 4);
+							glActiveTexture(GL_TEXTURE0 + 0);
+							glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
+						}
+
+						glPolygonOffset(-1.0, -1.0);
+						glEnable(GL_POLYGON_OFFSET_FILL);
+						glEnable(GL_BLEND);
+						glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						
+						checkGLError("9_2");
+						
+						glDrawArrays(GL_POINTS, 0, 1);
+						glDisable(GL_POLYGON_OFFSET_FILL);
+						glBindVertexArray(0);
 					}
-
-
-					glDrawArrays(GL_POINTS, 0, 1);
-					glBindVertexArray(0);
 
 					if (rClicked || (rPressed && keys.count(SDLK_LSHIFT)))
 					{
@@ -1071,7 +1215,7 @@ int main()
 
 			checkGLError("9");
 			
-			world.renderPass2(camera, player, nonOpaqueChunks, blockTexture, HSColorTexture);
+			renderCrosshair(window);
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);

@@ -59,7 +59,7 @@ void main() {
 	texCoord = vec2(1, 0);
 	gl_Position = glPos2;
 	viewSpace = viewSpace2;
-	cd = (fposition1 - eyePos) * clipDir;
+	cd = (fposition2 - eyePos) * clipDir;
 	gl_ClipDistance[0] = cd.x;
 	gl_ClipDistance[1] = cd.y;
 	gl_ClipDistance[2] = cd.z;
@@ -68,27 +68,7 @@ void main() {
 	texCoord = vec2(0, 1);
 	gl_Position = glPos3;
 	viewSpace = viewSpace3;
-	cd = (fposition1 - eyePos) * clipDir;
-	gl_ClipDistance[0] = cd.x;
-	gl_ClipDistance[1] = cd.y;
-	gl_ClipDistance[2] = cd.z;
-	EmitVertex();
-	
-	EndPrimitive();
-
-	texCoord = vec2(1, 0);
-	gl_Position = glPos2;
-	viewSpace = viewSpace2;
-	cd = (fposition1 - eyePos) * clipDir;
-	gl_ClipDistance[0] = cd.x;
-	gl_ClipDistance[1] = cd.y;
-	gl_ClipDistance[2] = cd.z;
-	EmitVertex();
-	
-	texCoord = vec2(0, 1);
-	gl_Position = glPos3;
-	viewSpace = viewSpace3;
-	cd = (fposition1 - eyePos) * clipDir;
+	cd = (fposition3 - eyePos) * clipDir;
 	gl_ClipDistance[0] = cd.x;
 	gl_ClipDistance[1] = cd.y;
 	gl_ClipDistance[2] = cd.z;
@@ -97,7 +77,7 @@ void main() {
 	texCoord = vec2(1, 1);
 	gl_Position = MVP * vec4(fposition4.xyz, 1);
 	viewSpace = MV * vec4(fposition4.xyz, 1);
-	cd = (fposition1 - eyePos) * clipDir;
+	cd = (fposition4 - eyePos) * clipDir;
 	gl_ClipDistance[0] = cd.x;
 	gl_ClipDistance[1] = cd.y;
 	gl_ClipDistance[2] = cd.z;

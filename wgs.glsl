@@ -58,18 +58,6 @@ void main() {
 	viewSpace = viewSpace3;
 	EmitVertex();
 	
-	EndPrimitive();
-
-	texCoord = vec2(1, 0);
-	gl_Position = glPos2;
-	viewSpace = viewSpace2;
-	EmitVertex();
-	
-	texCoord = vec2(0, 1);
-	gl_Position = glPos3;
-	viewSpace = viewSpace3;
-	EmitVertex();
-	
 	texCoord = vec2(1, 1);
 	gl_Position = MVP * vec4(fposition4, 1);
 	viewSpace = MV * vec4(fposition4, 1);

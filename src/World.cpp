@@ -809,33 +809,65 @@ bool World::getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math
 {
 	const float STEP = 0.01f;
 
-	math::vec3 s = p + math::vec3(0.5f, 0.5f, 0.5f);
-	math::vec3 d = ray * STEP;
-
-
-	math::ivec3 bp = floorCoord(p);
-
-	for (; (len -= STEP) > 0.0f;)
+	math::vec3 s = p;
+	
+	math::ivec3 bp_new = floorCoord(p + math::vec3(0.5f, 0.5f, 0.5f));
+	math::ivec3 bp;
+	
+	for (;;)
 	{
-		s += d;
-		math::ivec3 bp_new = floorCoord(s);
-
-		if (bp != bp_new)
+		bp = bp_new;
+		
+		double xs = ray.x > 0.0 ? (bp.x + 0.5) : (bp.x - 0.5);
+		double ys = ray.y > 0.0 ? (bp.y + 0.5) : (bp.y - 0.5);
+		double zs = ray.z > 0.0 ? (bp.z + 0.5) : (bp.z - 0.5);
+		
+		double xd = std::abs(xs - s.x);
+		double yd = std::abs(ys - s.y);
+		double zd = std::abs(zs - s.z);
+		
+		double xt = std::abs(ray.x) > 0 ? xd / std::abs(ray.x) : 1000.0;
+		double yt = std::abs(ray.y) > 0 ? yd / std::abs(ray.y) : 1000.0;
+		double zt = std::abs(ray.z) > 0 ? zd / std::abs(ray.z) : 1000.0;
+		
+		if (std::abs(ray.x) > 0 && xt > 0 && xt <= yt && xt <= zt)
 		{
-			CubeType cube = getCubeAt(bp_new);
+			bp_new.x += ray.x > 0.0 ? 1 : -1;
+			s.x = xs;
+			s.y = p.y + ray.y * (xs - p.x) / (ray.x);
+			s.z = p.z + ray.z * (xs - p.x) / (ray.x);
+		}
+		else if (std::abs(ray.y) > 0 && yt > 0 && yt <= zt && yt <= zt)
+		{
+			bp_new.y += ray.y > 0.0 ? 1 : -1;
+			s.x = p.x + ray.x * (ys - p.y) / (ray.y);
+			s.y = ys;
+			s.z = p.z + ray.z * (ys - p.y) / (ray.y);
+		}
+		else if (std::abs(ray.z) > 0)
+		{
+			bp_new.z += ray.z > 0.0 ? 1 : -1;
+			s.x = p.x + ray.x * (zs - p.z) / (ray.z);
+			s.y = p.y + ray.y * (zs - p.z) / (ray.z);
+			s.z = zs;
+		}
+		else
+		{
+			return false;
+		}
+		
+		if (math::length(s - p) > len)
+			return false;
+		
+		CubeType cube = getCubeAt(bp_new);
 
-			if (cube != 0)
-			{
-				result = bp_new;
-				prev = bp;
-				return true;
-			}
-
-			bp = bp_new;
+		if (cube != 0)
+		{
+			result = bp_new;
+			prev = bp;
+			return true;
 		}
 	}
-
-	return false;
 }
 
 bool World::putBlock(const math::ivec3 &v, CubeType c)

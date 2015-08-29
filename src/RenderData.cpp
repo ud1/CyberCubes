@@ -402,6 +402,13 @@ size_t RenderData::getVideoMemUse() const
 	return size * sizeof(Vertex);
 }
 
+typedef struct {
+	GLuint count;
+	GLuint primCount;
+	GLuint first;
+	GLuint baseInstance;
+} DrawArraysIndirectCommand;
+
 void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick, bool opaque)
 {
 	_renderTick = tick;
@@ -413,7 +420,9 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 
 	int indexOffset = 0;
 	
+	DrawArraysIndirectCommand commands[6];
 	int total = 0;
+	int k = 0;
 	for (int i = 0 ; i < 6; ++i)
 	{
 
@@ -451,11 +460,20 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 				GLsizei count = opaqueVertices[i].size() - opaqueLayerIndices[i][delta];
 				total += count;
 				if (count)
-					glDrawArrays(GL_POINTS, indexOffset + opaqueLayerIndices[i][delta], count);
+				{
+					commands[k].count = count;
+					commands[k].primCount = 1;
+					commands[k].first = indexOffset + opaqueLayerIndices[i][delta];
+					commands[k].baseInstance = 0;
+					++k;
+					//glDrawArrays(GL_POINTS, indexOffset + opaqueLayerIndices[i][delta], count);
+				}
 			}
 		}
 		indexOffset += opaqueVertices[i].size();
 	}
+
+	glMultiDrawArraysIndirect(GL_POINTS, commands, k, sizeof(DrawArraysIndirectCommand));
 	
 	if (!opaque && !nonOpaqueVertices.empty())
 	{
