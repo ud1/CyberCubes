@@ -80,6 +80,200 @@ block.lightValueG = 0;
 block.lightValueB = 100;
 block:registerBlock();
 
+
+block = Block:new();
+block.id = 20;
+block.name = "bedrock";
+block.mainTexture = "textures/bedrock.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 21;
+block.name = "sand";
+block.mainTexture = "textures/sand.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 22;
+block.name = "gold_ore";
+block.mainTexture = "textures/gold_ore.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 23;
+block.name = "iron_ore";
+block.mainTexture = "textures/iron_ore.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 24;
+block.name = "coal_ore";
+block.mainTexture = "textures/coal_ore.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 25;
+block.name = "lapis_ore";
+block.mainTexture = "textures/lapis_ore.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 26;
+block.name = "sandstone";
+block.mainTexture = "textures/sandstone_normal.png";
+block.textureZN = "textures/sandstone_bottom.png";
+block.textureZP = "textures/sandstone_top.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 27;
+block.name = "smooth_sandstone";
+block.mainTexture = "textures/sandstone_smooth.png";
+block.textureZN = "textures/sandstone_top.png";
+block.textureZP = "textures/sandstone_top.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 28;
+block.name = "chiseled_sandstone";
+block.mainTexture = "textures/sandstone_carved.png";
+block.textureZN = "textures/sandstone_top.png";
+block.textureZP = "textures/sandstone_top.png";
+block:registerBlock();
+
+
+block = Block:new();
+block.id = 29;
+block.name = "red_sand";
+block.mainTexture = "textures/red_sand.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 30;
+block.name = "red_sandstone";
+block.mainTexture = "textures/red_sandstone_normal.png";
+block.textureZN = "textures/red_sandstone_bottom.png";
+block.textureZP = "textures/red_sandstone_top.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 31;
+block.name = "smooth_red_sandstone";
+block.mainTexture = "textures/red_sandstone_smooth.png";
+block.textureZN = "textures/red_sandstone_top.png";
+block.textureZP = "textures/red_sandstone_top.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 32;
+block.name = "chiseled_red_sandstone";
+block.mainTexture = "textures/red_sandstone_carved.png";
+block.textureZN = "textures/red_sandstone_top.png";
+block.textureZP = "textures/red_sandstone_top.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 33;
+block.name = "diamond_ore";
+block.mainTexture = "textures/diamond_ore.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 34;
+block.name = "redstone_ore";
+block.mainTexture = "textures/redstone_ore.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 35;
+block.name = "snow";
+block.mainTexture = "textures/snow.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 36;
+block.name = "clay";
+block.mainTexture = "textures/clay.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 37;
+block.name = "mycelium";
+block.mainTexture = "textures/mycelium_side.png";
+block.textureZN = "textures/dirt.png";
+block.textureZP = "textures/mycelium_top.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 38;
+block.name = "emerald_ore";
+block.mainTexture = "textures/emerald_ore.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 39;
+block.name = "hardened_clay";
+block.mainTexture = "textures/hardened_clay.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 40;
+block.name = "obsidian";
+block.mainTexture = "textures/obsidian.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 41;
+block.name = "gold_block";
+block.mainTexture = "textures/gold_block.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 42;
+block.name = "diamond_block";
+block.mainTexture = "textures/diamond_block.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 43;
+block.name = "emerald_block";
+block.mainTexture = "textures/emerald_block.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 44;
+block.name = "coal_block";
+block.mainTexture = "textures/coal_block.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 45;
+block.name = "iron_block";
+block.mainTexture = "textures/iron_block.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 46;
+block.name = "lapis_block";
+block.mainTexture = "textures/lapis_block.png";
+block:registerBlock();
+
+block = Block:new();
+block.id = 47;
+block.name = "redstone_block";
+block.mainTexture = "textures/redstone_block.png";
+block:registerBlock();
+
+
+block = Block:new();
+block.id = 50;
+block.name = "melon";
+block.mainTexture = "textures/melon_side.png";
+block.textureZN = "textures/melon_top.png";
+block.textureZP = "textures/melon_top.png";
+block:registerBlock();
+
+
 block = Block:new();
 block.id = 30000;
 block.name = "glass";

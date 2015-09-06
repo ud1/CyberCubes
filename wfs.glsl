@@ -11,7 +11,6 @@ flat in int ftextureId;
 flat in mat2 fglightMat;
 flat in mat2 fslightMat;
 
-uniform vec3 norm;
 uniform float fogFar;
 
 void main()

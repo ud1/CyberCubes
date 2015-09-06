@@ -361,14 +361,14 @@ void RenderData::uploadData()
 		
 		glBindBuffer(GL_ARRAY_BUFFER, triangleBufferObject);
 
-		glEnableVertexAttribArray(0); //0 is our index, refer to "location = 0" in the vertex shader
-		glVertexAttribPointer(0, 3, GL_BYTE, GL_FALSE, sizeof(Vertex), 0); //tell gl (shader!) how to interpret our vertex data
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_BYTE, GL_FALSE, sizeof(Vertex), 0);
 		
 		glEnableVertexAttribArray(1);
 		glVertexAttribIPointer(1, 1, GL_UNSIGNED_BYTE, sizeof(Vertex), &((Vertex *)nullptr)->normalIndex);
 		
-		glEnableVertexAttribArray(2); //0 is our index, refer to "location = 0" in the vertex shader
-		glVertexAttribPointer(2, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->colorH); //tell gl (shader!) how to interpret our vertex data
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->colorH);
 		
 		glEnableVertexAttribArray(3);
 		glVertexAttribIPointer(3, 1, GL_SHORT, sizeof(Vertex), &((Vertex *)nullptr)->textureId);
@@ -420,7 +420,9 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 
 	int indexOffset = 0;
 	
-	DrawArraysIndirectCommand commands[6];
+	GLint mdFirst[6];
+	GLsizei mdCount[6];
+	
 	int total = 0;
 	int k = 0;
 	for (int i = 0 ; i < 6; ++i)
@@ -461,19 +463,17 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 				total += count;
 				if (count)
 				{
-					commands[k].count = count;
-					commands[k].primCount = 1;
-					commands[k].first = indexOffset + opaqueLayerIndices[i][delta];
-					commands[k].baseInstance = 0;
+					mdFirst[k] = indexOffset + opaqueLayerIndices[i][delta];
+					mdCount[k] = count;
 					++k;
-					//glDrawArrays(GL_POINTS, indexOffset + opaqueLayerIndices[i][delta], count);
 				}
 			}
 		}
 		indexOffset += opaqueVertices[i].size();
 	}
 
-	glMultiDrawArraysIndirect(GL_POINTS, commands, k, sizeof(DrawArraysIndirectCommand));
+	if (k)
+		glMultiDrawArrays(GL_POINTS, mdFirst, mdCount, k);
 	
 	if (!opaque && !nonOpaqueVertices.empty())
 	{
@@ -521,12 +521,12 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 	glBindVertexArray(0);
 }
 
-int getTextureId(CubeType cubeType)
+int getTextureId(CubeType cubeType, Dir dir)
 {
 	int textureId = 0;
 	Block *block = Block::get(cubeType);
 	if (block)
-		textureId = block->textureId;
+		textureId = block->textureId[(int) dir];
 	
 	return textureId;
 }
@@ -565,7 +565,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 				math::ivec3 p = math::ivec3(i, j, k);
 				if (chunk.hasEdge(p, Dir::XN))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::XN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::XN), Dir::XN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 0] = index;
@@ -576,7 +576,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(CHUNK_SIZE - 1 - i, j, k);
 				if (chunk.hasEdge(p, Dir::XP))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::XP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::XP), Dir::XP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 1] = index;
@@ -587,7 +587,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, i, k);
 				if (chunk.hasEdge(p, Dir::YN))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::YN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::YN), Dir::YN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 2] = index;
@@ -598,7 +598,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, CHUNK_SIZE - 1 - i, k);
 				if (chunk.hasEdge(p, Dir::YP))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::YP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::YP), Dir::YP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 3] = index;
@@ -609,7 +609,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, k, i);
 				if (chunk.hasEdge(p, Dir::ZN))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::ZN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::ZN), Dir::ZN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 4] = index;
@@ -620,7 +620,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, k, CHUNK_SIZE - 1 - i);
 				if (chunk.hasEdge(p, Dir::ZP))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p)), Dir::ZP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::ZP), Dir::ZP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 5] = index;

@@ -1,6 +1,6 @@
 /*
 ** Lua binding: Block
-** Generated automatically by tolua++-1.0.93 on Sat Aug 22 17:05:45 2015.
+** Generated automatically by tolua++-1.0.93 on Sun Aug 30 19:46:22 2015.
 */
 
 #ifndef __cplusplus
@@ -31,67 +31,8 @@ static int tolua_collect_Block (lua_State* tolua_S)
 /* function to register type */
 static void tolua_reg_types (lua_State* tolua_S)
 {
- tolua_usertype(tolua_S,"CubeType");
  tolua_usertype(tolua_S,"Block");
 }
-
-/* function: isOpaque */
-#ifndef TOLUA_DISABLE_tolua_Block_isOpaque00
-static int tolua_Block_isOpaque00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
-     (tolua_isvaluenil(tolua_S,1,&tolua_err) || !tolua_isusertype(tolua_S,1,"CubeType",0,&tolua_err)) ||
-     !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
-  goto tolua_lerror;
- else
-#endif
- {
-  CubeType type = *((CubeType*)  tolua_tousertype(tolua_S,1,0));
-  {
-   bool tolua_ret = (bool)  isOpaque(type);
-   tolua_pushboolean(tolua_S,(bool)tolua_ret);
-  }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'isOpaque'.",&tolua_err);
- return 0;
-#endif
-}
-#endif //#ifndef TOLUA_DISABLE
-
-/* function: isSunFullyTransparent */
-#ifndef TOLUA_DISABLE_tolua_Block_isSunFullyTransparent00
-static int tolua_Block_isSunFullyTransparent00(lua_State* tolua_S)
-{
-#ifndef TOLUA_RELEASE
- tolua_Error tolua_err;
- if (
-     (tolua_isvaluenil(tolua_S,1,&tolua_err) || !tolua_isusertype(tolua_S,1,"CubeType",0,&tolua_err)) ||
-     !tolua_isnoobj(tolua_S,2,&tolua_err)
- )
-  goto tolua_lerror;
- else
-#endif
- {
-  CubeType type = *((CubeType*)  tolua_tousertype(tolua_S,1,0));
-  {
-   bool tolua_ret = (bool)  isSunFullyTransparent(type);
-   tolua_pushboolean(tolua_S,(bool)tolua_ret);
-  }
- }
- return 1;
-#ifndef TOLUA_RELEASE
- tolua_lerror:
- tolua_error(tolua_S,"#ferror in function 'isSunFullyTransparent'.",&tolua_err);
- return 0;
-#endif
-}
-#endif //#ifndef TOLUA_DISABLE
 
 /* method: new of class  Block */
 #ifndef TOLUA_DISABLE_tolua_Block_Block_new00
@@ -235,6 +176,186 @@ static int tolua_set_Block_mainTexture(lua_State* tolua_S)
    tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
 #endif
   self->mainTexture = ((std::string)  tolua_tocppstring(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: textureXN of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_textureXN
+static int tolua_get_Block_textureXN(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureXN'",NULL);
+#endif
+  tolua_pushcppstring(tolua_S,(const char*)self->textureXN);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: textureXN of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_textureXN
+static int tolua_set_Block_textureXN(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureXN'",NULL);
+  if (!tolua_iscppstring(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->textureXN = ((std::string)  tolua_tocppstring(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: textureXP of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_textureXP
+static int tolua_get_Block_textureXP(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureXP'",NULL);
+#endif
+  tolua_pushcppstring(tolua_S,(const char*)self->textureXP);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: textureXP of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_textureXP
+static int tolua_set_Block_textureXP(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureXP'",NULL);
+  if (!tolua_iscppstring(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->textureXP = ((std::string)  tolua_tocppstring(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: textureYN of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_textureYN
+static int tolua_get_Block_textureYN(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureYN'",NULL);
+#endif
+  tolua_pushcppstring(tolua_S,(const char*)self->textureYN);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: textureYN of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_textureYN
+static int tolua_set_Block_textureYN(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureYN'",NULL);
+  if (!tolua_iscppstring(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->textureYN = ((std::string)  tolua_tocppstring(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: textureYP of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_textureYP
+static int tolua_get_Block_textureYP(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureYP'",NULL);
+#endif
+  tolua_pushcppstring(tolua_S,(const char*)self->textureYP);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: textureYP of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_textureYP
+static int tolua_set_Block_textureYP(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureYP'",NULL);
+  if (!tolua_iscppstring(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->textureYP = ((std::string)  tolua_tocppstring(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: textureZN of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_textureZN
+static int tolua_get_Block_textureZN(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureZN'",NULL);
+#endif
+  tolua_pushcppstring(tolua_S,(const char*)self->textureZN);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: textureZN of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_textureZN
+static int tolua_set_Block_textureZN(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureZN'",NULL);
+  if (!tolua_iscppstring(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->textureZN = ((std::string)  tolua_tocppstring(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* get function: textureZP of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_textureZP
+static int tolua_get_Block_textureZP(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureZP'",NULL);
+#endif
+  tolua_pushcppstring(tolua_S,(const char*)self->textureZP);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: textureZP of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_textureZP
+static int tolua_set_Block_textureZP(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureZP'",NULL);
+  if (!tolua_iscppstring(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->textureZP = ((std::string)  tolua_tocppstring(tolua_S,2,0))
 ;
  return 0;
 }
@@ -451,31 +572,53 @@ static int tolua_set_Block_hardness(lua_State* tolua_S)
 #endif //#ifndef TOLUA_DISABLE
 
 /* get function: textureId of class  Block */
-#ifndef TOLUA_DISABLE_tolua_get_Block_textureId
-static int tolua_get_Block_textureId(lua_State* tolua_S)
+#ifndef TOLUA_DISABLE_tolua_get_Block_Block_textureId
+static int tolua_get_Block_Block_textureId(lua_State* tolua_S)
 {
-  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+ int tolua_index;
+  Block* self;
+ lua_pushstring(tolua_S,".self");
+ lua_rawget(tolua_S,1);
+ self = (Block*)  lua_touserdata(tolua_S,-1);
 #ifndef TOLUA_RELEASE
-  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureId'",NULL);
+ {
+  tolua_Error tolua_err;
+  if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in array indexing.",&tolua_err);
+ }
 #endif
-  tolua_pushnumber(tolua_S,(lua_Number)self->textureId);
+ tolua_index = (int)tolua_tonumber(tolua_S,2,0);
+#ifndef TOLUA_RELEASE
+ if (tolua_index<0 || tolua_index>=6)
+  tolua_error(tolua_S,"array indexing out of range.",NULL);
+#endif
+ tolua_pushnumber(tolua_S,(lua_Number)self->textureId[tolua_index]);
  return 1;
 }
 #endif //#ifndef TOLUA_DISABLE
 
 /* set function: textureId of class  Block */
-#ifndef TOLUA_DISABLE_tolua_set_Block_textureId
-static int tolua_set_Block_textureId(lua_State* tolua_S)
+#ifndef TOLUA_DISABLE_tolua_set_Block_Block_textureId
+static int tolua_set_Block_Block_textureId(lua_State* tolua_S)
 {
-  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+ int tolua_index;
+  Block* self;
+ lua_pushstring(tolua_S,".self");
+ lua_rawget(tolua_S,1);
+ self = (Block*)  lua_touserdata(tolua_S,-1);
 #ifndef TOLUA_RELEASE
+ {
   tolua_Error tolua_err;
-  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'textureId'",NULL);
   if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
-   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+   tolua_error(tolua_S,"#vinvalid type in array indexing.",&tolua_err);
+ }
 #endif
-  self->textureId = ((int)  tolua_tonumber(tolua_S,2,0))
-;
+ tolua_index = (int)tolua_tonumber(tolua_S,2,0);
+#ifndef TOLUA_RELEASE
+ if (tolua_index<0 || tolua_index>=6)
+  tolua_error(tolua_S,"array indexing out of range.",NULL);
+#endif
+  self->textureId[tolua_index] = ((int)  tolua_tonumber(tolua_S,3,0));
  return 0;
 }
 #endif //#ifndef TOLUA_DISABLE
@@ -506,6 +649,40 @@ static int tolua_Block_Block_registerBlock00(lua_State* tolua_S)
 #ifndef TOLUA_RELEASE
  tolua_lerror:
  tolua_error(tolua_S,"#ferror in function 'registerBlock'.",&tolua_err);
+ return 0;
+#endif
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* method: getTexture of class  Block */
+#ifndef TOLUA_DISABLE_tolua_Block_Block_getTexture00
+static int tolua_Block_Block_getTexture00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+     !tolua_isusertype(tolua_S,1,"Block",0,&tolua_err) ||
+     !tolua_isnumber(tolua_S,2,0,&tolua_err) ||
+     !tolua_isnoobj(tolua_S,3,&tolua_err)
+ )
+  goto tolua_lerror;
+ else
+#endif
+ {
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+  int side = ((int)  tolua_tonumber(tolua_S,2,0));
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in function 'getTexture'", NULL);
+#endif
+  {
+   std::string tolua_ret = (std::string)  self->getTexture(side);
+   tolua_pushcppstring(tolua_S,(const char*)tolua_ret);
+  }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'getTexture'.",&tolua_err);
  return 0;
 #endif
 }
@@ -626,6 +803,8 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
   tolua_constant(tolua_S,"BLOCK_SEA_LANTERN",BLOCK_SEA_LANTERN);
   tolua_constant(tolua_S,"BLOCK_HARDENED_CLAY",BLOCK_HARDENED_CLAY);
   tolua_constant(tolua_S,"BLOCK_PACKED_ICE",BLOCK_PACKED_ICE);
+  tolua_constant(tolua_S,"BLOCK_GLASS",BLOCK_GLASS);
+  tolua_constant(tolua_S,"BLOCK_LEAVES",BLOCK_LEAVES);
   tolua_constant(tolua_S,"BLOCK_GRASS",BLOCK_GRASS);
   tolua_constant(tolua_S,"BLOCK_TORCH",BLOCK_TORCH);
   tolua_constant(tolua_S,"BLOCK_FIRE",BLOCK_FIRE);
@@ -638,7 +817,6 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
   tolua_constant(tolua_S,"BLOCK_FLOWING_WATER",BLOCK_FLOWING_WATER);
   tolua_constant(tolua_S,"BLOCK_FLOWING_LAVA",BLOCK_FLOWING_LAVA);
   tolua_constant(tolua_S,"BLOCK_LAVA",BLOCK_LAVA);
-  tolua_constant(tolua_S,"BLOCK_LEAVES",BLOCK_LEAVES);
   tolua_constant(tolua_S,"BLOCK_WEB",BLOCK_WEB);
   tolua_constant(tolua_S,"BLOCK_TALLGRASS",BLOCK_TALLGRASS);
   tolua_constant(tolua_S,"BLOCK_DEADBUSH",BLOCK_DEADBUSH);
@@ -682,8 +860,6 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
   tolua_constant(tolua_S,"BLOCK_POTATOES",BLOCK_POTATOES);
   tolua_constant(tolua_S,"BLOCK_LEAVES2",BLOCK_LEAVES2);
   tolua_constant(tolua_S,"BLOCK_DOUBLE_PLANT",BLOCK_DOUBLE_PLANT);
-  tolua_function(tolua_S,"isOpaque",tolua_Block_isOpaque00);
-  tolua_function(tolua_S,"isSunFullyTransparent",tolua_Block_isSunFullyTransparent00);
   #ifdef __cplusplus
   tolua_cclass(tolua_S,"Block","Block","",tolua_collect_Block);
   #else
@@ -696,6 +872,12 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
    tolua_variable(tolua_S,"id",tolua_get_Block_id,tolua_set_Block_id);
    tolua_variable(tolua_S,"name",tolua_get_Block_name,tolua_set_Block_name);
    tolua_variable(tolua_S,"mainTexture",tolua_get_Block_mainTexture,tolua_set_Block_mainTexture);
+   tolua_variable(tolua_S,"textureXN",tolua_get_Block_textureXN,tolua_set_Block_textureXN);
+   tolua_variable(tolua_S,"textureXP",tolua_get_Block_textureXP,tolua_set_Block_textureXP);
+   tolua_variable(tolua_S,"textureYN",tolua_get_Block_textureYN,tolua_set_Block_textureYN);
+   tolua_variable(tolua_S,"textureYP",tolua_get_Block_textureYP,tolua_set_Block_textureYP);
+   tolua_variable(tolua_S,"textureZN",tolua_get_Block_textureZN,tolua_set_Block_textureZN);
+   tolua_variable(tolua_S,"textureZP",tolua_get_Block_textureZP,tolua_set_Block_textureZP);
    tolua_variable(tolua_S,"opaque",tolua_get_Block_opaque,tolua_set_Block_opaque);
    tolua_variable(tolua_S,"lightOpacity",tolua_get_Block_lightOpacity,tolua_set_Block_lightOpacity);
    tolua_variable(tolua_S,"lightValueSun",tolua_get_Block_lightValueSun,tolua_set_Block_lightValueSun);
@@ -703,8 +885,9 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
    tolua_variable(tolua_S,"lightValueG",tolua_get_Block_lightValueG,tolua_set_Block_lightValueG);
    tolua_variable(tolua_S,"lightValueB",tolua_get_Block_lightValueB,tolua_set_Block_lightValueB);
    tolua_variable(tolua_S,"hardness",tolua_get_Block_hardness,tolua_set_Block_hardness);
-   tolua_variable(tolua_S,"textureId",tolua_get_Block_textureId,tolua_set_Block_textureId);
+   tolua_array(tolua_S,"textureId",tolua_get_Block_Block_textureId,tolua_set_Block_Block_textureId);
    tolua_function(tolua_S,"registerBlock",tolua_Block_Block_registerBlock00);
+   tolua_function(tolua_S,"getTexture",tolua_Block_Block_getTexture00);
    tolua_function(tolua_S,"get",tolua_Block_Block_get00);
    tolua_function(tolua_S,"get",tolua_Block_Block_get01);
   tolua_endmodule(tolua_S);

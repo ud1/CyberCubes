@@ -10,15 +10,16 @@ struct Block
 
 	int id;
 	std::string name;
-	std::string mainTexture;
+	std::string mainTexture, textureXN, textureXP, textureYN, textureYP, textureZN, textureZP;
 	bool opaque;
 	int lightOpacity;
 	int lightValueSun, lightValueR, lightValueG, lightValueB;
 	float hardness;
 	
-	int textureId;
+	int textureId[6];
 
 	void registerBlock();
+	std::string getTexture(int side);
 	static Block *get(int id);
 	static const Block *get(const std::string &name);
 };

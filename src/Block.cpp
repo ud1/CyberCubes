@@ -31,6 +31,39 @@ void Block::registerBlock()
 	std::cout << "Register block, id = " << id << ", name = " << name << std::endl;
 }
 
+std::string Block::getTexture(int side)
+{
+	switch ((Dir) side)
+	{
+		case Dir::XN:
+			if (!textureXN.empty())
+				return textureXN;
+			break;
+		case Dir::XP:
+			if (!textureXP.empty())
+				return textureXP;
+			break;
+		case Dir::YN:
+			if (!textureYN.empty())
+				return textureYN;
+			break;
+		case Dir::YP:
+			if (!textureYP.empty())
+				return textureYP;
+			break;
+		case Dir::ZN:
+			if (!textureZN.empty())
+				return textureZN;
+			break;
+		case Dir::ZP:
+			if (!textureZP.empty())
+				return textureZP;
+			break;
+	}
+	
+	return mainTexture;
+}
+
 Block *Block::get(int id)
 {
 	BlocksById::iterator it = blocksById.find(id);

@@ -28,6 +28,7 @@
 #include "Player.hpp"
 #include "Block.hpp"
 #include "Inventory.hpp"
+#include "BlockRenderer.hpp"
 
 static const struct
 {
@@ -234,8 +235,7 @@ void render2d(SDL_Window *window, NVGcontext* vg);
 
 using namespace cyberCubes;
 using namespace cyberCubes::gui;
-
-
+using namespace cyberCubes::render;
 
 namespace
 {
@@ -252,6 +252,8 @@ namespace
 	
 	bool renderHighlight;
 }
+
+GLuint blockTexture;
 
 void renderCrosshair(SDL_Window *window)
 {
@@ -514,31 +516,34 @@ int main()
 
 		if (block)
 		{
-			if (textureNameIdMap.count(block->mainTexture))
+			for (int i = 0; i < 6; ++i)
 			{
-				block->textureId = textureNameIdMap[block->mainTexture];
-			}
-			else
-			{
-				SDL_Surface *image = IMG_Load(block->mainTexture.c_str());
-
-				if (!image || image->w != 16 || image->h != 16)
+				std::string textureName = block->getTexture(i);
+				if (textureNameIdMap.count(textureName))
 				{
-					std::cout << "Wrong image " << type << std::endl;
-
-					block->textureId = 0;
-					textureNameIdMap[block->mainTexture] = 0;
-					continue;
+					block->textureId[i] = textureNameIdMap[textureName];
 				}
+				else
+				{
+					SDL_Surface *image = IMG_Load(textureName.c_str());
 
-				images[++blockTextureId] = image;
-				block->textureId = blockTextureId;
-				textureNameIdMap[block->mainTexture] = blockTextureId;
+					if (!image || image->w != 16 || image->h != 16)
+					{
+						std::cout << "Wrong image " << type << std::endl;
+
+						block->textureId[i] = 0;
+						textureNameIdMap[textureName] = 0;
+						continue;
+					}
+
+					images[++blockTextureId] = image;
+					block->textureId[i] = blockTextureId;
+					textureNameIdMap[textureName] = blockTextureId;
+				}
 			}
 		}
 	}
 
-	GLuint blockTexture;
 	glGenTextures(1, &blockTexture);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
 	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 4, GL_RGBA8, 16, 16, blockTextureId + 1);
@@ -555,7 +560,7 @@ int main()
 		{
 			for (int x = 0; x < 16; ++x)
 			{
-				Uint8 *p = (Uint8 *)image->pixels + y * image->pitch + x * bpp;
+				Uint8 *p = (Uint8 *)image->pixels + (15 - y) * image->pitch + x * bpp;
 
 				data[(y * 16 + x) * 4 + 0] = p[0];
 				data[(y * 16 + x) * 4 + 1] = p[1];
@@ -579,7 +584,11 @@ int main()
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LOD, 4);
+	//glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LOD, 4);
+	float aniso = 0.0f;
+	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
+	glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+	std::cout << "Anisotropy level " << aniso << std::endl;
 
 	GLuint HSColorTexture;
 	glGenTextures(1, &HSColorTexture);
@@ -661,8 +670,6 @@ int main()
 
 	double globalT = 0.0f;
 
-	int blockType = 1;
-
 	NVGcontext* vg = nvgCreateGL3(NVG_STENCIL_STROKES | NVG_DEBUG);
 	if (!vg)
 	{
@@ -673,7 +680,8 @@ int main()
 	if (!loadFonts(vg))
 		return -1;
 	
-	inventory = new Inventory(*vg);
+	BlockRenderer renderer;
+	inventory = new Inventory(*vg, renderer);
 	
 	GLuint timerQuery;
 	glGenQueries(1, &timerQuery);
@@ -744,6 +752,9 @@ int main()
 			{
 				lPressed = false;
 			}
+			
+			if (e.type == SDL_MOUSEWHEEL)
+				inventory->changeSelectedHotbar(-e.wheel.y);
 		}
 
 		if (pressedKeys.count(SDLK_PAUSE))
@@ -760,32 +771,14 @@ int main()
 			std::cout << "flyMode " << flyMode << std::endl;
 		}
 
-		if (pressedKeys.count(SDLK_1))
-			blockType = 8;
-
-		if (pressedKeys.count(SDLK_2))
-			blockType = 9;
-
-		if (pressedKeys.count(SDLK_3))
-			blockType = 10;
-		
-		if (pressedKeys.count(SDLK_4))
-			blockType = 11;
-		
-		if (pressedKeys.count(SDLK_5))
-			blockType = 30015;
-		
-		if (pressedKeys.count(SDLK_6))
-			blockType = 30016;
-		
-		if (pressedKeys.count(SDLK_7))
-			blockType = 30017;
-		
-		if (pressedKeys.count(SDLK_8))
-			blockType = 30018;
-		
-		if (pressedKeys.count(SDLK_9))
-			blockType = 30019;
+		for (int i = 0; i < 9; ++i)
+		{
+			if (pressedKeys.count(SDLK_1 + i))
+			{
+				inventory->setSelectedHotbarSlot(i);
+				break;
+			}
+		}
 
 		if (pressedKeys.count(SDLK_e))
 			inventoryShow = !inventoryShow;
@@ -958,8 +951,8 @@ int main()
 		glDisable(GL_BLEND);
 		glDisable(GL_SCISSOR_TEST);
 		
-		world.dayNightLightCoef = (1.0 + std::cos(globalT / 20.0))/2.0;
-		//world.dayNightLightCoef = 1.0f;
+		//world.dayNightLightCoef = (1.0 + std::cos(globalT / 20.0))/2.0;
+		world.dayNightLightCoef = 1.0f;
 		//std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
 
 		std::vector<IntCoord> nonOpaqueChunks;
@@ -1199,11 +1192,15 @@ int main()
 						glBindVertexArray(0);
 					}
 
-					if (rClicked || (rPressed && keys.count(SDLK_LSHIFT)))
+					int blockType = inventory->getHotbarCell(inventory->getSelectedHotbarSlot()).blockId;
+					if (blockType > 0)
 					{
-						world.putBlock(prevBPos, blockType);
+						if (rClicked || (rPressed && keys.count(SDLK_LSHIFT)))
+						{
+							world.putBlock(prevBPos, blockType);
 
-						std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
+							std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
+						}
 					}
 
 					if (lClicked || (lPressed && keys.count(SDLK_LSHIFT)))
@@ -1323,5 +1320,10 @@ void render2d(SDL_Window *window, NVGcontext* vg)
 	if (inventoryShow)
 		inventory->render(w, h);
 	
+	inventory->renderHotbar(w, h);
+	
 	nvgEndFrame(vg);
+	
+	inventory->renderHotbarItems(w, h);
+	checkGLError("R2");
 }

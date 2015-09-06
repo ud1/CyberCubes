@@ -9,6 +9,7 @@ endif()
 add_executable(cubercubes
 main.cpp
 src/Block.cpp
+src/BlockRenderer.cpp
 src/Camera.cpp
 src/Chunk.cpp
 src/colorTransform.cpp

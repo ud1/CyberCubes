@@ -8,7 +8,6 @@ flat in int ftextureId;
 flat in mat2 fglightMat;
 flat in mat2 fslightMat;
 
-uniform vec3 norm;
 uniform float fogFar;
 uniform float lightMultiplier;
 uniform vec3 fogColor;
