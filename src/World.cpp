@@ -1284,7 +1284,7 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 	std::multimap<float, IntCoord> playerChunks;
 	for (IntCoord coord : player.getChunks())
 	{
-		math::vec3 d = i2f(coord)*CHUNK_SIZE_F + math::vec3(CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f) - player.getPosition();
+		math::vec3 d = i2f(coord)*CHUNK_SIZE_F + math::vec3(CHUNK_SIZE_F / 2.0f - 0.5f, CHUNK_SIZE_F / 2.0f - 0.5f, CHUNK_SIZE_F / 2.0f - 0.5f) - player.getPosition();
 		float dist = math::length(d);
 		playerChunks.insert(std::make_pair(dist, coord));
 	}
@@ -1380,11 +1380,11 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 		if (isChunkCanBeRendered(coord, false))
 		{
 			math::vec3 pos = i2f(coord) * CHUNK_SIZE_F - math::vec3(0.5f, 0.5f, 0.5f);
-			math::BBox bbox(pos, math::vec3(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE));
+			math::BBox bbox(pos, math::vec3(CHUNK_SIZE_F, CHUNK_SIZE_F, CHUNK_SIZE_F));
 
 			if (frustum.checkBBox(bbox) != math::IntersectionType::OUTSIDE)
 			{
-				pos += math::vec3(CHUNK_SIZE / 2, CHUNK_SIZE / 2, CHUNK_SIZE / 2) - camera.position;
+				pos += math::vec3(CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f) - camera.position;
 				float dist2 = math::dot(pos, pos);
 				visibleChunks.insert(std::make_pair(dist2, coord));
 			}
@@ -1420,7 +1420,9 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 	std::vector<bool> oqVisibleChunksVector;
 
 	for (VisibleChunksMap::iterator it = visibleChunks.begin(); it != visibleChunks.end(); ++it)
+	{
 		visibleChunksVector.push_back(it->second);
+	}
 
 	//std::cout << "SZ " << visibleChunksVector.size() << std::endl;
 
@@ -1615,7 +1617,7 @@ void World::renderPass2(const Camera &camera, const cyberCubes::Player &player, 
 	std::multimap<float, IntCoord> playerChunks;
 	for (const IntCoord &coord : nonOpaqueChunks)
 	{
-		math::vec3 d = i2f(coord)*CHUNK_SIZE_F + math::vec3(CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f, CHUNK_SIZE_F / 2.0f) - player.getPosition();
+		math::vec3 d = i2f(coord)*CHUNK_SIZE_F + math::vec3(CHUNK_SIZE_F / 2.0f - 0.5f, CHUNK_SIZE_F / 2.0f - 0.5f, CHUNK_SIZE_F / 2.0f - 0.5f) - player.getPosition();
 		float dist = math::length(d);
 		playerChunks.insert(std::make_pair(-dist, coord));
 	}

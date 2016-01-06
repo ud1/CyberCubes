@@ -26,4 +26,17 @@ T clamp(T val, T minV, T maxV)
 	return val;
 }
 
+struct FloatSmoothing
+{
+	float value, period;
+
+	FloatSmoothing(float value, float period) : value(value), period(period) {}
+
+	float set(float new_val, float dt)
+	{
+		value += (new_val - value) * (1.0 - std::exp(-dt / period));
+		return value;
+	}
+};
+
 #endif // MATH_H_INCLUDED

@@ -6,6 +6,7 @@ flat in int ftextureId;
 flat in mat2 fglightMat;
 
 uniform sampler2DArray blockSampler;
+uniform vec3 lightColor;
 
 void main()
 {
@@ -14,7 +15,7 @@ void main()
 	float glight = dot(r1, fglightMat * r2);
 	
 	vec4 tex_color = texture(blockSampler, vec3(texCoord, ftextureId));
-	vec3 color = vec3(1, 1, 1) * (pow(0.02, 1.0 - glight) - 0.02*(1.0 - glight));
+	vec3 color = lightColor * (pow(0.02, 1.0 - glight) - 0.02*(1.0 - glight));
 	vec3 result = tex_color.rgb * color;
 	
 	outputColor = vec4(result, tex_color.w);

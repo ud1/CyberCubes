@@ -483,17 +483,17 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 			bool yp = (k & 2);
 			bool zp = (k & 4);
 			
-			if (xp && eye.x < 0.0f)
+			if (xp && eye.x < -0.5f)
 				continue;
-			if (yp && eye.y < 0.0f)
+			if (yp && eye.y < -0.5f)
 				continue;
-			if (zp && eye.z < 0.0f)
+			if (zp && eye.z < -0.5f)
 				continue;
-			if (!xp && eye.x > CHUNK_SIZE_F)
+			if (!xp && eye.x > CHUNK_SIZE_F - 0.5f)
 				continue;
-			if (!yp && eye.y > CHUNK_SIZE_F)
+			if (!yp && eye.y > CHUNK_SIZE_F - 0.5f)
 				continue;
-			if (!zp && eye.z > CHUNK_SIZE_F)
+			if (!zp && eye.z > CHUNK_SIZE_F - 0.5f)
 				continue;
 			
 			math::vec3 clipDir = math::vec3(xp ? -1 : 1, yp ? -1 : 1, zp ? -1 : 1);

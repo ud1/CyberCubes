@@ -1,5 +1,6 @@
 #include "BlockRenderer.hpp"
 #include "Math.hpp"
+#include "Chunk.hpp"
 #include <cstdint>
 
 extern GLuint blockTexture;
@@ -36,7 +37,7 @@ BlockRenderer::BlockRenderer() : simpleBlockShader("simpleBlockShader")
 	glBindVertexArray(0);
 }
 
-void BlockRenderer::renderInventoryBlock(Block *block, const math::mat4 &mvp)
+void BlockRenderer::renderInventoryBlock(const Block *block, const math::mat4 &mvp)
 {
 	SimpleBlockVertex vertexData[6];
 	
@@ -106,6 +107,17 @@ void BlockRenderer::renderInventoryBlock(Block *block, const math::mat4 &mvp)
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
 	}
+	
+	if (simpleBlockShader.uniforms.count("lightColor"))
+	{	
+		math::vec3 color = math::vec3(block->lightValueR, block->lightValueG, block->lightValueB) / MAX_LIGHT_F;
+		if (!block->lightValueR && !block->lightValueG && !block->lightValueB)
+			color = math::vec3(1.0f, 1.0f, 1.0f);
+		
+		glUniform3fv(simpleBlockShader.uniforms["lightColor"], 1, &color[0]);
+	}
+	
+	
 	
 	glEnable(GL_DEPTH_TEST);
 	glDrawArrays(GL_POINTS, 0, 6);

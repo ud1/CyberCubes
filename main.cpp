@@ -29,6 +29,8 @@
 #include "Block.hpp"
 #include "Inventory.hpp"
 #include "BlockRenderer.hpp"
+#include "SoundSystem.h"
+#include "Input.hpp"
 
 static const struct
 {
@@ -200,19 +202,6 @@ void checkGLError(const char *str)
 		printf("glError: %s %d\n", str, error);
 }
 
-struct FloatSmoothing
-{
-	float value, period;
-
-	FloatSmoothing(float value, float period) : value(value), period(period) {}
-
-	float set(float new_val, float dt)
-	{
-		value += (new_val - value) * (1.0 - std::exp(-dt / period));
-		return value;
-	}
-};
-
 bool loadFonts(NVGcontext* vg)
 {
 	int font;
@@ -376,6 +365,10 @@ int main()
 
 	World world;
 	world.create();
+	
+	SoundSystem soundSystem;
+	soundSystem.initialize();
+	//soundSystem.playBackground("music/Andrew_Seistrup_-_A_Glimpse_of_Who_She_Was.ogg", 1.0);
 
 	Player player(&world);
 
@@ -423,10 +416,6 @@ int main()
 
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 
-	math::vec3 vel = math::vec3(0.0f, 0.0f, 0.0f);
-	std::set<int> keys, pressedKeys;
-
-	char bGameLoopRunning = 1;
 	boost::timer::cpu_timer timer;
 
 	glEnable(GL_DEPTH_TEST);
@@ -662,11 +651,7 @@ int main()
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(math::vec2), 0);
 	glBindVertexArray(0);
 
-	bool pause = false;
-
 	glPolygonOffset(1.0, 1.0);
-
-	bool flyMode = true;
 
 	double globalT = 0.0f;
 
@@ -682,15 +667,19 @@ int main()
 	
 	BlockRenderer renderer;
 	inventory = new Inventory(*vg, renderer);
+	inventory->setWindowSize(width, height);
 	
 	GLuint timerQuery;
 	glGenQueries(1, &timerQuery);
 	
-	bool lPressed = false;
-	bool rPressed = false;
+	inventory->refreshNEIItems();
 	
-	while (bGameLoopRunning)
+	input::MainInput input(&world, inventory, &camera);
+	
+	while (input.gameLoopRunning)
 	{
+		soundSystem.update();
+		
 		glBeginQuery(GL_TIME_ELAPSED, timerQuery);
 		
 		const boost::timer::cpu_times elapsed_times = timer.elapsed();
@@ -699,253 +688,9 @@ int main()
 		globalT += dt;
 
 		timer.start();
-		SDL_Event e;
 
-		pressedKeys.clear();
-		bool rClicked = false;
-		bool lClicked = false;
-
-		while (SDL_PollEvent(&e))
-		{
-			if (e.type == SDL_QUIT)
-				bGameLoopRunning = 0;
-			else if (e.type == SDL_KEYUP && e.key.keysym.sym == SDLK_ESCAPE)
-				bGameLoopRunning = 0;
-
-			if (e.type == SDL_KEYDOWN)
-			{
-				keys.insert(e.key.keysym.sym);
-				pressedKeys.insert(e.key.keysym.sym);
-			}
-
-			if (e.type == SDL_KEYUP)
-			{
-				keys.erase(e.key.keysym.sym);
-			}
-
-			if (!pause)
-			{
-				if (e.type == SDL_MOUSEMOTION)
-				{
-					camera.rotate(e.motion.xrel, e.motion.yrel);
-				}
-			}
-
-			if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT)
-			{
-				rClicked = true;
-				rPressed = true;
-			}
-
-			if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
-			{
-				lClicked = true;
-				lPressed = true;
-			}
-			
-			if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT)
-			{
-				rPressed = false;
-			}
-			
-			if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
-			{
-				lPressed = false;
-			}
-			
-			if (e.type == SDL_MOUSEWHEEL)
-				inventory->changeSelectedHotbar(-e.wheel.y);
-		}
-
-		if (pressedKeys.count(SDLK_PAUSE))
-		{
-			pause = !pause;
-			keys.erase(SDLK_PAUSE);
-			SDL_SetRelativeMouseMode(pause ? SDL_FALSE : SDL_TRUE);
-		}
-
-		if (pressedKeys.count(SDLK_f))
-		{
-			flyMode = !flyMode;
-
-			std::cout << "flyMode " << flyMode << std::endl;
-		}
-
-		for (int i = 0; i < 9; ++i)
-		{
-			if (pressedKeys.count(SDLK_1 + i))
-			{
-				inventory->setSelectedHotbarSlot(i);
-				break;
-			}
-		}
-
-		if (pressedKeys.count(SDLK_e))
-			inventoryShow = !inventoryShow;
-		
-		
-		if (flyMode)
-		{
-			math::vec3 accel = math::vec3(0.0f, 0.0f, 0.0f);
-
-			if (keys.count(SDLK_w))
-				accel.y += 1.0;
-
-			if (keys.count(SDLK_s))
-				accel.y -= 1.0;
-
-			if (keys.count(SDLK_d))
-				accel.x += 1.0;
-
-			if (keys.count(SDLK_a))
-				accel.x -= 1.0;
-
-			if (keys.count(SDLK_SPACE))
-				accel.z += 1.0;
-
-			if (keys.count(SDLK_LCTRL))
-				accel.z -= 1.0;
-
-			if (!keys.count(SDLK_w) && !keys.count(SDLK_s))
-			{
-				int sgn = (vel.y < 0.0f) ? -1 : ((vel.y > 0.0f) ? 1 : 0);
-				accel.y = -sgn;
-			}
-
-			if (!keys.count(SDLK_d) && !keys.count(SDLK_a))
-			{
-				int sgn = (vel.x < 0.0f) ? -1 : ((vel.x > 0.0f) ? 1 : 0);
-				accel.x = -sgn;
-			}
-
-			if (!keys.count(SDLK_SPACE) && !keys.count(SDLK_LCTRL))
-			{
-				int sgn = (vel.z < 0.0f) ? -1 : ((vel.z > 0.0f) ? 1 : 0);
-				accel.z = -sgn;
-			}
-
-			accel *= 20.0f;
-
-			math::vec3 oldVel = vel;
-			vel += accel * dt;
-
-			if (!keys.count(SDLK_w) && !keys.count(SDLK_s) && vel.y * oldVel.y < 0.0f)
-				vel.y = 0.0f;
-
-			if (!keys.count(SDLK_d) && !keys.count(SDLK_a) && vel.x * oldVel.x < 0.0f)
-				vel.x = 0.0f;
-
-			if (!keys.count(SDLK_SPACE) && !keys.count(SDLK_LCTRL) && vel.z * oldVel.z < 0.0f)
-				vel.z = 0.0f;
-
-			float maxVel = 50.0f;
-
-			if (math::length(vel) > maxVel)
-				vel *= (maxVel / math::length(vel));
-
-			math::vec3 dPos = vel * dt;
-
-			math::vec3 playerSize = math::vec3(0.6f, 0.6f, 1.7f);
-			math::vec3 eyeOffset = math::vec3(0.3f, 0.3f, 1.6f);
-			math::BBox b(camera.position - eyeOffset, playerSize);
-
-			dPos = camera.transform(dPos.y, dPos.x, dPos.z);
-			world.move(b, dPos);
-			dPos = b.point - (camera.position - eyeOffset);
-
-			math::vec3 cdPos = camera.untransform(dPos);
-			cdPos = math::vec3(cdPos.y, cdPos.x, cdPos.z);
-			vel = cdPos / dt;
-
-			camera.position += dPos;
-		}
-		else
-		{
-			math::vec3 accel = math::vec3(0.0f, 0.0f, 0.0f);
-			const float MAX_ACCEL = 10.0f;
-
-			math::vec3 dirF = camera.transform(1.0, 0.0f, 0.0f);
-			dirF.z = 0.0f;
-			dirF = math::normalize(dirF) * MAX_ACCEL;
-
-			math::vec3 dirR = camera.transform(0.0, 1.0f, 0.0f);
-			dirR.z = 0.0f;
-			dirR = math::normalize(dirR) * MAX_ACCEL;
-			
-			math::vec3 playerSize = math::vec3(0.6f, 0.6f, 1.7f);
-			math::vec3 widePlayerSize = math::vec3(0.6f, 0.8f, 1.7f);
-			math::vec3 eyeOffset = math::vec3(0.3f, 0.3f, 1.6f);
-			bool touchGround = false, wideTouchGround = false;
-			{
-				math::vec3 corner = camera.position - eyeOffset;
-				math::BBox b(corner, playerSize);
-				math::vec3 dPos =  math::vec3(0, 0, -0.2f);
-				world.move(b, dPos);
-			
-				if (b.point.z > (corner.z + dPos.z + 1e-3))
-					touchGround = true;
-				
-				b.point = corner;
-				b.size = widePlayerSize;
-				
-				world.move(b, dPos);
-			
-				if (b.point.z > (corner.z + dPos.z + 1e-3))
-					wideTouchGround = true;
-			}
-
-			float velLen = math::length(vel);
-			
-			if (touchGround)
-			{
-				if (keys.count(SDLK_w))
-					accel += dirF;
-
-				if (keys.count(SDLK_s))
-					accel -= dirF;
-
-				if (keys.count(SDLK_d))
-					accel += dirR;
-
-				if (keys.count(SDLK_a))
-					accel -= dirR;
-
-				if (pressedKeys.count(SDLK_SPACE))
-					vel.z = 5.0f;
-			}
-			
-			if (wideTouchGround && !pressedKeys.count(SDLK_SPACE))
-			{
-				if (math::length(accel) > 0.01)
-					vel.z += 0.2 / (1.0f + velLen / 10.0f);
-			}
-			
-			vel += accel * dt / (1.0f + velLen / 10.0f);
-			vel.z -= 9.8f * dt;			
-			float fCoef = math::pow(0.98f, dt);
-
-			vel *= fCoef;
-			
-			if (touchGround)
-			{
-				math::vec3 hv = math::vec3(vel.x, vel.y, 0.0f);
-				const float DV = 5.0f * dt;
-
-				if (math::length(hv) > DV)
-					hv = math::normalize(hv) * DV;
-
-				vel -= hv;
-			}
-
-			math::vec3 dPos = vel * dt;
-			
-			math::BBox b(camera.position - eyeOffset, playerSize);
-			world.move(b, dPos);
-			dPos = b.point - (camera.position - eyeOffset);
-			vel = dPos / dt;
-
-			camera.position += dPos;
-		}
+		input.processInput(dt);
+		inventoryShow = input.isInventoryMode();
 
 		glDisable(GL_CULL_FACE);
 		glDisable(GL_BLEND);
@@ -1192,20 +937,23 @@ int main()
 						glBindVertexArray(0);
 					}
 
-					int blockType = inventory->getHotbarCell(inventory->getSelectedHotbarSlot()).blockId;
-					if (blockType > 0)
+					if (input.isPlayerMode())
 					{
-						if (rClicked || (rPressed && keys.count(SDLK_LSHIFT)))
+						int blockType = inventory->getHotbarCell(inventory->getSelectedHotbarSlot()).blockId;
+						if (blockType > 0)
 						{
-							world.putBlock(prevBPos, blockType);
+							if (input.rClicked || (input.rPressed && input.keys.count(SDLK_LSHIFT)))
+							{
+								world.putBlock(prevBPos, blockType);
 
-							std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
+								std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
+							}
 						}
-					}
 
-					if (lClicked || (lPressed && keys.count(SDLK_LSHIFT)))
-					{
-						world.putBlock(bpos, 0);
+						if (input.lClicked || (input.lPressed && input.keys.count(SDLK_LSHIFT)))
+						{
+							world.putBlock(bpos, 0);
+						}
 					}
 				}
 			}
@@ -1257,7 +1005,7 @@ int main()
 		SDL_GL_SwapWindow(window);
 		//SDL_Delay(20);
 
-		if (pressedKeys.count(SDLK_F2))
+		if (input.pressedKeys.count(SDLK_F2))
 		{
 			int w, h;
 			SDL_GetWindowSize(window, &w, &h);
@@ -1314,16 +1062,27 @@ void render2d(SDL_Window *window, NVGcontext* vg)
 	nvgText(vg, 0, 20, oss.str().c_str(), nullptr);
 	
 	oss.str("");
-	oss << "Pos " << std::fixed << std::setprecision(0) << camera.position.x << " " << camera.position.y << " " << camera.position.z;
+	oss << "Pos " << std::fixed << std::setprecision(1) << camera.position.x << " " << camera.position.y << " " << camera.position.z;
 	nvgText(vg, 0, 40, oss.str().c_str(), nullptr);
 	
+	inventory->setWindowSize(w, h);
 	if (inventoryShow)
-		inventory->render(w, h);
+	{
+		inventory->render();
+		inventory->renderNEI();
+	}
 	
-	inventory->renderHotbar(w, h);
+	inventory->renderHotbar();
 	
 	nvgEndFrame(vg);
 	
-	inventory->renderHotbarItems(w, h);
+	inventory->renderHotbarItems();
+	if (inventoryShow)
+	{
+		inventory->renderInventoryItems();
+		inventory->renderNEIItems();
+		inventory->renderDraggedItem();
+	}
+	
 	checkGLError("R2");
 }

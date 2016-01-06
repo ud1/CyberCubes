@@ -10,6 +10,7 @@ Camera::Camera()
 	yaw = pitch = 0.0f;
 	pitch = 0.0f;
 	fov = 80.0f / 180.0 * M_PI;
+	fovMultiplier = 1.0;
 	aspectRatio = 1.0f;
 	zNear = 0.02f;
 	zFar = 1000.0f;
@@ -42,7 +43,7 @@ math::mat4 Camera::getMatrix() const
 
 math::mat4 Camera::getVP() const
 {
-	math::mat4 proj = math::perspective(fov, aspectRatio, zNear, zFar);
+	math::mat4 proj = math::perspective(fov * fovMultiplier, aspectRatio, zNear, zFar);
 	return proj * getMatrix();
 }
 

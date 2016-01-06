@@ -14,7 +14,7 @@ class BlockRenderer
 {
 public:
 	BlockRenderer();
-	void renderInventoryBlock(Block *block, const math::mat4 &mvp);
+	void renderInventoryBlock(const Block *block, const math::mat4 &mvp);
 	
 private:
 	Shader simpleBlockShader;

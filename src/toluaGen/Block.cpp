@@ -1,6 +1,6 @@
 /*
 ** Lua binding: Block
-** Generated automatically by tolua++-1.0.93 on Sun Aug 30 19:46:22 2015.
+** Generated automatically by tolua++-1.0.93 on Wed Jan  6 00:43:47 2016.
 */
 
 #ifndef __cplusplus
@@ -25,12 +25,20 @@ static int tolua_collect_Block (lua_State* tolua_S)
 	Mtolua_delete(self);
 	return 0;
 }
+
+static int tolua_collect_std__unordered_map_int_Block_ (lua_State* tolua_S)
+{
+ std::unordered_map<int,Block>* self = (std::unordered_map<int,Block>*) tolua_tousertype(tolua_S,1,0);
+	Mtolua_delete(self);
+	return 0;
+}
 #endif
 
 
 /* function to register type */
 static void tolua_reg_types (lua_State* tolua_S)
 {
+ tolua_usertype(tolua_S,"std::unordered_map<int,Block>");
  tolua_usertype(tolua_S,"Block");
 }
 
@@ -744,6 +752,44 @@ tolua_lerror:
 }
 #endif //#ifndef TOLUA_DISABLE
 
+/* method: getBlockIdMap of class  Block */
+#ifndef TOLUA_DISABLE_tolua_Block_Block_getBlockIdMap00
+static int tolua_Block_Block_getBlockIdMap00(lua_State* tolua_S)
+{
+#ifndef TOLUA_RELEASE
+ tolua_Error tolua_err;
+ if (
+     !tolua_isusertable(tolua_S,1,"Block",0,&tolua_err) ||
+     !tolua_isnoobj(tolua_S,2,&tolua_err)
+ )
+  goto tolua_lerror;
+ else
+#endif
+ {
+  {
+   const std::unordered_map<int,Block> tolua_ret = (const std::unordered_map<int,Block>)  Block::getBlockIdMap();
+   {
+#ifdef __cplusplus
+    void* tolua_obj = Mtolua_new((std::unordered_map<int,Block>)(tolua_ret));
+     tolua_pushusertype(tolua_S,tolua_obj,"const std::unordered_map<int,Block>");
+    tolua_register_gc(tolua_S,lua_gettop(tolua_S));
+#else
+    void* tolua_obj = tolua_copy(tolua_S,(void*)&tolua_ret,sizeof(const std::unordered_map<int,Block>));
+     tolua_pushusertype(tolua_S,tolua_obj,"const std::unordered_map<int,Block>");
+    tolua_register_gc(tolua_S,lua_gettop(tolua_S));
+#endif
+   }
+  }
+ }
+ return 1;
+#ifndef TOLUA_RELEASE
+ tolua_lerror:
+ tolua_error(tolua_S,"#ferror in function 'getBlockIdMap'.",&tolua_err);
+ return 0;
+#endif
+}
+#endif //#ifndef TOLUA_DISABLE
+
 /* Open function */
 TOLUA_API int tolua_Block_open (lua_State* tolua_S)
 {
@@ -890,6 +936,7 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
    tolua_function(tolua_S,"getTexture",tolua_Block_Block_getTexture00);
    tolua_function(tolua_S,"get",tolua_Block_Block_get00);
    tolua_function(tolua_S,"get",tolua_Block_Block_get01);
+   tolua_function(tolua_S,"getBlockIdMap",tolua_Block_Block_getBlockIdMap00);
   tolua_endmodule(tolua_S);
  tolua_endmodule(tolua_S);
  return 1;

@@ -16,7 +16,7 @@ public:
     math::vec3 transform(float f, float r, float u) const;
     math::vec3 untransform(const math::vec3 &v) const;
 
-    float fov, aspectRatio;
+    float fov, aspectRatio, fovMultiplier;
     float zNear, zFar;
     math::vec3 position;
     math::vec3 fw, r;

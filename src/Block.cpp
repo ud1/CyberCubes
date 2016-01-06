@@ -1,11 +1,11 @@
 #include "Block.hpp"
-#include <unordered_map>
 #include <iostream>
 #include "Chunk.hpp"
 #include "Math.hpp"
 
 typedef std::unordered_map<int, Block> BlocksById;
 typedef std::unordered_map<std::string, const Block *> BlocksByName;
+
 static BlocksById blocksById;
 static BlocksByName blocksByName;
 
@@ -80,4 +80,9 @@ const Block *Block::get(const std::string &name)
 		return nullptr;
 
 	return it->second;
+}
+
+const std::unordered_map<int, Block> &Block::getBlockIdMap()
+{
+	return blocksById;
 }
