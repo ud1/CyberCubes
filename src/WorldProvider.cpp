@@ -72,6 +72,22 @@ WorldProvider::WorldProvider()
 	}
 	
 	{
+		const char *sql = "CREATE TABLE IF NOT EXISTS CHUNK_BLOCK_DATA("  \
+			"X INT NOT NULL," \
+			"Y INT NOT NULL," \
+			"Z INT NOT NULL," \
+			"DATA BLOB NOT NULL," \
+			"PRIMARY KEY (X, Y, Z));";
+
+		/* Execute SQL statement */
+		SqlLiteString errMsg;
+		rc = sqlite3_exec(db, sql, nullptr, 0, &errMsg.str);
+
+		if (rc != SQLITE_OK)
+			std::cout << "Create CHUNK_BLOCK_DATA table error: " << errMsg.str;
+	}
+	
+	{
 		const char *sql = "CREATE TABLE IF NOT EXISTS CHUNK_SLP("  \
 			"X INT NOT NULL," \
 			"Y INT NOT NULL," \
@@ -96,6 +112,19 @@ WorldProvider::WorldProvider()
 		std::cout << "Create INSERT chunk data prepared statement failed: " << rc << std::endl;
 	
 	
+	rc = sqlite3_prepare_v2(db, "SELECT DATA FROM CHUNK_BLOCK_DATA WHERE X = ?1 AND Y = ?2 AND Z = ?3", -1, &selectChunkBlockDataStmt, nullptr);
+	if (rc != SQLITE_OK)
+		std::cout << "Create SELECT chunk block data prepared statement failed: " << rc << std::endl;
+	
+	rc = sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO CHUNK_BLOCK_DATA(X, Y, Z, DATA) VALUES(?1, ?2, ?3, ?4)", -1, &insertChunkBlockDataStmt, nullptr);
+	if (rc != SQLITE_OK)
+		std::cout << "Create INSERT chunk block data prepared statement failed: " << rc << std::endl;
+	
+	rc = sqlite3_prepare_v2(db, "DELETE FROM CHUNK_BLOCK_DATA WHERE X = ?1 AND Y = ?2 AND Z = ?3", -1, &deleteChunkBlockDataStmt, nullptr);
+	if (rc != SQLITE_OK)
+		std::cout << "Create DELETE chunk block data prepared statement failed: " << rc << std::endl;
+	
+	
 	rc = sqlite3_prepare_v2(db, "SELECT DATA FROM CHUNK_SLP WHERE X = ?1 AND Y = ?2 AND Z = ?3", -1, &selectChunkSLPStmt, nullptr);
 	if (rc != SQLITE_OK)
 		std::cout << "Create SELECT chunk SLP data prepared statement failed: " << rc << std::endl;
@@ -110,10 +139,19 @@ WorldProvider::~WorldProvider()
 
 	sqlite3_finalize(selectChunkDataStmt);
 	sqlite3_finalize(insertChunkDataStmt);
+	sqlite3_finalize(selectChunkBlockDataStmt);
+	sqlite3_finalize(insertChunkBlockDataStmt);
+	sqlite3_finalize(deleteChunkBlockDataStmt);
 	sqlite3_finalize(selectChunkSLPStmt);
 	sqlite3_finalize(insertChunkSLPStmt);
 	sqlite3_close(db);
 }
+
+struct BlockDataRecord
+{
+	uint16_t ind;
+	BlockData data;
+};
 
 bool WorldProvider::save(const Chunk &chunk, const math::ivec3 &pos, bool rewrite)
 {
@@ -141,7 +179,58 @@ bool WorldProvider::save(const Chunk &chunk, const math::ivec3 &pos, bool rewrit
 	
 	sqlite3_reset(insertChunkDataStmt);
 	
-	return rc == SQLITE_DONE;
+	if (rc != SQLITE_DONE)
+		return false;
+	
+	//=============== Save block data
+	
+	if (insertChunkBlockDataStmt && deleteChunkBlockDataStmt)
+	{
+		if (chunk.blockData.empty())
+		{
+			sqlite3_bind_int(deleteChunkBlockDataStmt, 1, pos.x);
+			sqlite3_bind_int(deleteChunkBlockDataStmt, 2, pos.y);
+			sqlite3_bind_int(deleteChunkBlockDataStmt, 3, pos.z);
+			int rc = sqlite3_step(deleteChunkBlockDataStmt);
+			
+			sqlite3_reset(deleteChunkBlockDataStmt);
+			
+			return rc == SQLITE_DONE;
+		}
+		else
+		{
+			std::vector<BlockDataRecord> inBuffer;
+			inBuffer.reserve(chunk.blockData.size());
+			
+			for (auto &kv : chunk.blockData)
+			{
+				BlockDataRecord record;
+				record.ind = kv.first;
+				record.data = kv.second;
+				inBuffer.push_back(record);
+			}
+			
+			outputSize = compressBound(inBuffer.size() * sizeof(BlockDataRecord));
+			buffer.resize(outputSize);
+			int resultCode = compress2(buffer.data(), &outputSize, reinterpret_cast<Bytef *>(inBuffer.data()), inBuffer.size() * sizeof(BlockDataRecord), 3);
+			result = resultCode == Z_OK;
+			
+			if (!result)
+				return false;
+			
+			sqlite3_bind_int(insertChunkBlockDataStmt, 1, pos.x);
+			sqlite3_bind_int(insertChunkBlockDataStmt, 2, pos.y);
+			sqlite3_bind_int(insertChunkBlockDataStmt, 3, pos.z);
+			sqlite3_bind_blob(insertChunkBlockDataStmt, 4, (const void *) buffer.data(), outputSize, SQLITE_TRANSIENT);
+			int rc = sqlite3_step(insertChunkBlockDataStmt);
+			
+			sqlite3_reset(insertChunkBlockDataStmt);
+		
+			return rc == SQLITE_DONE;
+		}
+	}
+	
+	return true;
 }
 
 bool WorldProvider::load(Chunk &chunk, const math::ivec3 &pos)
@@ -172,7 +261,46 @@ bool WorldProvider::load(Chunk &chunk, const math::ivec3 &pos)
 	bool result = resultCode == Z_OK && destLen == sizeof(chunk.cubes);
 	
 	sqlite3_reset(selectChunkDataStmt);
-	return result;
+	if (!result)
+		return false;
+	
+	chunk.blockData.clear();
+	if (selectChunkBlockDataStmt)
+	{
+		sqlite3_bind_int(selectChunkBlockDataStmt, 1, pos.x);
+		sqlite3_bind_int(selectChunkBlockDataStmt, 2, pos.y);
+		sqlite3_bind_int(selectChunkBlockDataStmt, 3, pos.z);
+		int rc = sqlite3_step(selectChunkBlockDataStmt);
+		if (rc != SQLITE_ROW)
+		{
+			sqlite3_reset(selectChunkBlockDataStmt);
+			return true;
+		}
+		
+		const void *data = sqlite3_column_blob(selectChunkBlockDataStmt, 0);
+		int dataLen = sqlite3_column_bytes(selectChunkBlockDataStmt, 0);
+		if (!data)
+		{
+			sqlite3_reset(selectChunkBlockDataStmt);
+			return true;
+		}
+		
+		uLongf destLen = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * sizeof(BlockDataRecord);
+		std::vector<BlockDataRecord> buffer;
+		buffer.resize(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE);
+		int resultCode = uncompress(reinterpret_cast<Bytef *>(buffer.data()), &destLen, (const Bytef *) data, dataLen);
+		if (resultCode == Z_OK)
+		{
+			BlockDataRecord *records = buffer.data();
+			
+			for (size_t i = 0; i < destLen / sizeof(BlockDataRecord); ++i)
+			{
+				chunk.blockData.insert(std::make_pair(records[i].ind, records[i].data));
+			}
+		}
+	}
+	
+	return true;
 }
 
 bool WorldProvider::load(SunLightPropagationLayer &layer, const math::ivec3 &pos)

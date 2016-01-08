@@ -25,6 +25,7 @@ public:
 private:
 	sqlite3 *db;
 	sqlite3_stmt *selectChunkDataStmt, *insertChunkDataStmt;
+	sqlite3_stmt *selectChunkBlockDataStmt, *insertChunkBlockDataStmt, *deleteChunkBlockDataStmt;
 	sqlite3_stmt *selectChunkSLPStmt, *insertChunkSLPStmt;
 };
 

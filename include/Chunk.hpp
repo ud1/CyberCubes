@@ -3,6 +3,7 @@
 
 #include "Math.hpp"
 #include <atomic>
+#include <unordered_map>
 #include "types.hpp"
 
 constexpr int MAX_LIGHT = 31;
@@ -151,6 +152,7 @@ struct Chunk
 
 	CubeType cubes[CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
 	LightValue light[LIGHT_COUNT][CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
+	std::unordered_map<uint16_t, BlockData> blockData;
 	
 	SunLightPropagationLayer *slpl;
 
@@ -180,6 +182,9 @@ struct Chunk
 
 	CubeType cubeAt(const math::ivec3 &p) const;
 	CubeType rawCubeAt(const math::ivec3 &p) const;
+	BlockData getBlockData(const math::ivec3 &p) const;
+	void setBlockData(const math::ivec3 &p, BlockData data);
+	static unsigned char decodeRotation(BlockData data);
 	
 	void computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const;
 	

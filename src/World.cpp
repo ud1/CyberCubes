@@ -870,7 +870,7 @@ bool World::getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math
 	}
 }
 
-bool World::putBlock(const math::ivec3 &v, CubeType c)
+bool World::putBlock(const math::ivec3 &v, CubeType c, BlockData data)
 {
 	math::ivec3 chuckC = getChunkCoord(v);
 	
@@ -884,6 +884,7 @@ bool World::putBlock(const math::ivec3 &v, CubeType c)
 		return false;
 	
 	chunk->put(bp, c);
+	chunk->setBlockData(bp, data);
 
 	std::vector<AddedBlockLight> addedBlocks, addedSunLightBlocks;
 	std::vector<math::ivec3> removedBlocks, removedSunLightBlocks;

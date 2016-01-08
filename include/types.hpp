@@ -5,5 +5,6 @@
 
 typedef signed char LightValue;
 typedef uint16_t CubeType;
+typedef uint16_t BlockData;
 
 #endif

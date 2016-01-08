@@ -944,7 +944,10 @@ int main()
 						{
 							if (input.rClicked || (input.rPressed && input.keys.count(SDLK_LSHIFT)))
 							{
-								world.putBlock(prevBPos, blockType);
+								Block * block = Block::get(blockType);
+								math::vec3 upDir = camera.transform(0.0f, 0.0f, 1.0f);
+								int rotation = getRotation(dir, upDir, block->rotationGroup);
+								world.putBlock(prevBPos, blockType, rotation);
 
 								std::cout << "ADDB " << eucModChunk(prevBPos.x) << " " << eucModChunk(prevBPos.y) << " " << eucModChunk(prevBPos.z) << std::endl;
 							}
@@ -952,7 +955,7 @@ int main()
 
 						if (input.lClicked || (input.lPressed && input.keys.count(SDLK_LSHIFT)))
 						{
-							world.putBlock(bpos, 0);
+							world.putBlock(bpos, 0, 0);
 						}
 					}
 				}

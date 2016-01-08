@@ -273,6 +273,18 @@ block.textureZN = "textures/melon_top.png";
 block.textureZP = "textures/melon_top.png";
 block:registerBlock();
 
+block = Block:new();
+block.id = 1000;
+block.name = "test";
+block.textureXN = "textures/XN.png";
+block.textureXP = "textures/XP.png";
+block.textureYN = "textures/YN.png";
+block.textureYP = "textures/YP.png";
+block.textureZN = "textures/ZN.png";
+block.textureZP = "textures/ZP.png";
+block.rotationGroup = 48;
+block:registerBlock();
+
 
 block = Block:new();
 block.id = 30000;

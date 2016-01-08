@@ -5,6 +5,7 @@ layout(location = 1) out vec4 outputData2;
 layout(location = 2) out vec4 outputData3;
 layout(location = 3) out int outputMaterial;
 in vec4 viewSpace;
+in vec2 relCoord;
 in vec2 texCoord;
 flat in vec2 fcolor;
 flat in int ftextureId;
@@ -19,8 +20,8 @@ void main()
 	float fogFactor = (fogFar - dist)/(fogFar - 3*fogFar/4);
 	fogFactor = clamp( fogFactor, 0.0, 1.0 );
 	
-	vec2 r1 = vec2(1 - texCoord.x, texCoord.x);
-	vec2 r2 = vec2(1 - texCoord.y, texCoord.y);
+	vec2 r1 = vec2(1 - relCoord.x, relCoord.x);
+	vec2 r2 = vec2(1 - relCoord.y, relCoord.y);
 	float slight = dot(r1, fslightMat * r2);
 	float glight = dot(r1, fglightMat * r2);
 	

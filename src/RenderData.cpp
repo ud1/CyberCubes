@@ -110,7 +110,7 @@ RenderData::~RenderData()
 		glDeleteVertexArrays(1, &nonOpaqueVao);
 }
 
-size_t RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk, bool opaque)
+size_t RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk, unsigned char quadRotation, bool opaque)
 {
 	Vertex vertex;
 	vertex.x = pos.x;
@@ -118,6 +118,7 @@ size_t RenderData::addFace(const math::ivec3 &pos, int textureId, Dir dir, const
 	vertex.z = pos.z;
 	vertex.textureId = textureId + 1;
 	vertex.normalIndex = (unsigned char) dir;
+	vertex.rotation = quadRotation;
 
 	if (dir == Dir::XN)
 	{
@@ -371,13 +372,16 @@ void RenderData::uploadData()
 		glVertexAttribPointer(2, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->colorH);
 		
 		glEnableVertexAttribArray(3);
-		glVertexAttribIPointer(3, 1, GL_SHORT, sizeof(Vertex), &((Vertex *)nullptr)->textureId);
+		glVertexAttribIPointer(3, 2, GL_UNSIGNED_BYTE, sizeof(Vertex), &((Vertex *)nullptr)->rotation);
 		
 		glEnableVertexAttribArray(4);
-		glVertexAttribPointer(4, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->l1);
+		glVertexAttribIPointer(4, 1, GL_SHORT, sizeof(Vertex), &((Vertex *)nullptr)->textureId);
 		
 		glEnableVertexAttribArray(5);
-		glVertexAttribPointer(5, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->sl1);
+		glVertexAttribPointer(5, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->l1);
+		
+		glEnableVertexAttribArray(6);
+		glVertexAttribPointer(6, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->sl1);
 		
 		if (i == 1)
 		{
@@ -521,12 +525,12 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 	glBindVertexArray(0);
 }
 
-int getTextureId(CubeType cubeType, Dir dir)
+int getTextureId(CubeType cubeType, Dir dir, int rot)
 {
 	int textureId = 0;
 	Block *block = Block::get(cubeType);
 	if (block)
-		textureId = block->textureId[(int) dir];
+		textureId = block->textureId[(int) RotationMatrices::getInstance().invRotate(dir, rot)];
 	
 	return textureId;
 }
@@ -563,9 +567,12 @@ void RenderData::addVertexData(const Chunk &chunk)
 				bool opaque;
 				
 				math::ivec3 p = math::ivec3(i, j, k);
+				
 				if (chunk.hasEdge(p, Dir::XN))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::XN), Dir::XN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
+					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::XN, rot);
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::XN, rot), Dir::XN, chunk, quadRot, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 0] = index;
@@ -576,7 +583,9 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(CHUNK_SIZE - 1 - i, j, k);
 				if (chunk.hasEdge(p, Dir::XP))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::XP), Dir::XP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
+					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::XP, rot);
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::XP, rot), Dir::XP, chunk, quadRot, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 1] = index;
@@ -587,7 +596,9 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, i, k);
 				if (chunk.hasEdge(p, Dir::YN))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::YN), Dir::YN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
+					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::YN, rot);
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::YN, rot), Dir::YN, chunk, quadRot, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 2] = index;
@@ -598,7 +609,9 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, CHUNK_SIZE - 1 - i, k);
 				if (chunk.hasEdge(p, Dir::YP))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::YP), Dir::YP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
+					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::YP, rot);
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::YP, rot), Dir::YP, chunk, quadRot, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 3] = index;
@@ -609,7 +622,9 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, k, i);
 				if (chunk.hasEdge(p, Dir::ZN))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::ZN), Dir::ZN, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
+					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::ZN, rot);
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::ZN, rot), Dir::ZN, chunk, quadRot, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 4] = index;
@@ -620,7 +635,9 @@ void RenderData::addVertexData(const Chunk &chunk)
 				p = math::ivec3(j, k, CHUNK_SIZE - 1 - i);
 				if (chunk.hasEdge(p, Dir::ZP))
 				{
-					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::ZP), Dir::ZP, chunk, opaque = isOpaque(chunk.rawCubeAt(p)));
+					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
+					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::ZP, rot);
+					index = addFace(p, getTextureId(chunk.rawCubeAt(p), Dir::ZP, rot), Dir::ZP, chunk, quadRot, opaque = isOpaque(chunk.rawCubeAt(p)));
 					if (!opaque)
 					{
 						facesInds[(((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z)*6 + 5] = index;

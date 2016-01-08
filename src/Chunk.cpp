@@ -206,6 +206,30 @@ CubeType Chunk::rawCubeAt(const math::ivec3 &p) const
 	return cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
 }
 
+BlockData Chunk::getBlockData(const math::ivec3 &p) const
+{
+	int index = ((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z;
+	auto iterator = blockData.find(index);
+	if (iterator == blockData.end())
+		return 0;
+	
+	return iterator->second;
+}
+
+void Chunk::setBlockData(const math::ivec3 &p, BlockData data)
+{
+	int index = ((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z;
+	if (data == 0)
+		blockData.erase(index);
+	else
+		blockData[index] = data;
+}
+
+unsigned char Chunk::decodeRotation(BlockData data)
+{
+	return data;
+}
+
 void Chunk::recalcBlockCount()
 {
 	unsigned opaqueCount = 0;

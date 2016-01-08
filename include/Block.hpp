@@ -2,6 +2,7 @@
 #define BLOCK_H
 #include <string>
 #include <unordered_map>
+#include "types.hpp"
 
 // tolua_export
 // tolua_begin
@@ -15,12 +16,14 @@ struct Block
 	bool opaque;
 	int lightOpacity;
 	int lightValueSun, lightValueR, lightValueG, lightValueB;
+	int rotationGroup; // 1, 4, 24, 48
 	float hardness;
 	
 	int textureId[6];
 
 	void registerBlock();
 	std::string getTexture(int side);
+	
 	static Block *get(int id);
 	static const Block *get(const std::string &name);
 	static const std::unordered_map<int, Block> &getBlockIdMap();

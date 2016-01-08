@@ -24,6 +24,7 @@ src/toluaGen/Block.cpp
 src/Inventory.cpp
 src/SoundSystem.cpp
 src/Input.cpp
+src/Math.cpp
 
 ext/nanovg/src/nanovg.c
 )

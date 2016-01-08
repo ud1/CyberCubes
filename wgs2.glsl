@@ -12,15 +12,18 @@ in vec4 glight[];
 in vec4 slight[];
 in vec2 gcolor[];
 in int gtextureId[];
+in int grotationIndex[];
 in int gnormalIndex[];
 
 out vec4 viewSpace;
+out vec2 relCoord;
 out vec2 texCoord;
 flat out vec2 fcolor;
 flat out int ftextureId;
 flat out mat2 fglightMat;
 flat out mat2 fslightMat;
 
+const mat2 texMat[8]  = mat2[8](mat2(1,0, 0,1), mat2(0,-1, 1,0), mat2(-1,0, 0,-1), mat2(0,1, -1,0),  mat2(-1,0, 0,1), mat2(0,-1, -1,0), mat2(1,0, 0,-1), mat2(0,1, 1,0));
 const vec3 normals[6] = vec3[6](vec3(-0.5, 0, 0), vec3(0.5, 0, 0), vec3(0, -0.5, 0), vec3(0, 0.5, 0), vec3(0, 0, -0.5), vec3(0, 0, 0.5));
 const vec3 t1s[6]     = vec3[6](vec3(0, 0.5, 0), vec3(0, 0.5, 0), vec3(0.5, 0, 0), vec3(0.5, 0, 0), vec3(0.5, 0, 0), vec3(0.5, 0, 0));
 const vec3 t2s[6]     = vec3[6](vec3(0, 0, 0.5), vec3(0, 0, 0.5), vec3(0, 0, 0.5), vec3(0, 0, 0.5), vec3(0, 0.5, 0), vec3(0, 0.5, 0));
@@ -47,7 +50,10 @@ void main() {
 	fslightMat = mat2(slight[0]);
 	ftextureId = gtextureId[0];
 	
-	texCoord = vec2(0, 0);
+	mat2 texMatrix = texMat[grotationIndex[0]];
+	
+	relCoord = vec2(0, 0);
+	texCoord = texMatrix * vec2(-0.5, -0.5) + vec2(0.5, 0.5);
 	gl_Position = MVP * vec4(fposition1.xyz, 1);
 	viewSpace = MV * vec4(fposition1.xyz, 1);
 	cd = (fposition1 - eyePos) * clipDir;
@@ -56,7 +62,8 @@ void main() {
 	gl_ClipDistance[2] = cd.z;
 	EmitVertex();
 
-	texCoord = vec2(1, 0);
+	relCoord = vec2(1, 0);
+	texCoord = texMatrix * vec2(0.5, -0.5) + vec2(0.5, 0.5);
 	gl_Position = glPos2;
 	viewSpace = viewSpace2;
 	cd = (fposition2 - eyePos) * clipDir;
@@ -65,7 +72,8 @@ void main() {
 	gl_ClipDistance[2] = cd.z;
 	EmitVertex();
 	
-	texCoord = vec2(0, 1);
+	relCoord = vec2(0, 1);
+	texCoord = texMatrix * vec2(-0.5, 0.5) + vec2(0.5, 0.5);
 	gl_Position = glPos3;
 	viewSpace = viewSpace3;
 	cd = (fposition3 - eyePos) * clipDir;
@@ -74,7 +82,8 @@ void main() {
 	gl_ClipDistance[2] = cd.z;
 	EmitVertex();
 	
-	texCoord = vec2(1, 1);
+	relCoord = vec2(1, 1);
+	texCoord = texMatrix * vec2(0.5, 0.5) + vec2(0.5, 0.5);
 	gl_Position = MVP * vec4(fposition4.xyz, 1);
 	viewSpace = MV * vec4(fposition4.xyz, 1);
 	cd = (fposition4 - eyePos) * clipDir;

@@ -15,6 +15,7 @@ struct Vertex
 	signed char x, y, z;
 	unsigned char normalIndex;
 	unsigned char colorH, colorS;
+	unsigned char rotation;
 	int16_t textureId;
 	unsigned char l1, l2, l3, l4;
 	unsigned char sl1, sl2, sl3, sl4;
@@ -36,7 +37,7 @@ struct RenderData
 	GLuint triangleBufferObject = 0;
 	GLuint indexBufferObject = 0;
 
-	size_t addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk, bool opaque);
+	size_t addFace(const math::ivec3 &pos, int textureId, Dir dir, const Chunk &chunk, unsigned char quadRotation, bool opaque);
 	void uploadData();
 	size_t getVideoMemUse() const;
 	void render(GLint clipDirLocation, const math::vec3 &eye, Tick tick, bool opaque);

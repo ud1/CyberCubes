@@ -1,6 +1,6 @@
 /*
 ** Lua binding: Block
-** Generated automatically by tolua++-1.0.93 on Wed Jan  6 00:43:47 2016.
+** Generated automatically by tolua++-1.0.93 on Fri Jan  8 19:54:20 2016.
 */
 
 #ifndef __cplusplus
@@ -22,13 +22,6 @@ TOLUA_API int  tolua_Block_open (lua_State* tolua_S);
 static int tolua_collect_Block (lua_State* tolua_S)
 {
  Block* self = (Block*) tolua_tousertype(tolua_S,1,0);
-	Mtolua_delete(self);
-	return 0;
-}
-
-static int tolua_collect_std__unordered_map_int_Block_ (lua_State* tolua_S)
-{
- std::unordered_map<int,Block>* self = (std::unordered_map<int,Block>*) tolua_tousertype(tolua_S,1,0);
 	Mtolua_delete(self);
 	return 0;
 }
@@ -549,6 +542,36 @@ static int tolua_set_Block_lightValueB(lua_State* tolua_S)
 }
 #endif //#ifndef TOLUA_DISABLE
 
+/* get function: rotationGroup of class  Block */
+#ifndef TOLUA_DISABLE_tolua_get_Block_rotationGroup
+static int tolua_get_Block_rotationGroup(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'rotationGroup'",NULL);
+#endif
+  tolua_pushnumber(tolua_S,(lua_Number)self->rotationGroup);
+ return 1;
+}
+#endif //#ifndef TOLUA_DISABLE
+
+/* set function: rotationGroup of class  Block */
+#ifndef TOLUA_DISABLE_tolua_set_Block_rotationGroup
+static int tolua_set_Block_rotationGroup(lua_State* tolua_S)
+{
+  Block* self = (Block*)  tolua_tousertype(tolua_S,1,0);
+#ifndef TOLUA_RELEASE
+  tolua_Error tolua_err;
+  if (!self) tolua_error(tolua_S,"invalid 'self' in accessing variable 'rotationGroup'",NULL);
+  if (!tolua_isnumber(tolua_S,2,0,&tolua_err))
+   tolua_error(tolua_S,"#vinvalid type in variable assignment.",&tolua_err);
+#endif
+  self->rotationGroup = ((int)  tolua_tonumber(tolua_S,2,0))
+;
+ return 0;
+}
+#endif //#ifndef TOLUA_DISABLE
+
 /* get function: hardness of class  Block */
 #ifndef TOLUA_DISABLE_tolua_get_Block_hardness
 static int tolua_get_Block_hardness(lua_State* tolua_S)
@@ -767,18 +790,8 @@ static int tolua_Block_Block_getBlockIdMap00(lua_State* tolua_S)
 #endif
  {
   {
-   const std::unordered_map<int,Block> tolua_ret = (const std::unordered_map<int,Block>)  Block::getBlockIdMap();
-   {
-#ifdef __cplusplus
-    void* tolua_obj = Mtolua_new((std::unordered_map<int,Block>)(tolua_ret));
-     tolua_pushusertype(tolua_S,tolua_obj,"const std::unordered_map<int,Block>");
-    tolua_register_gc(tolua_S,lua_gettop(tolua_S));
-#else
-    void* tolua_obj = tolua_copy(tolua_S,(void*)&tolua_ret,sizeof(const std::unordered_map<int,Block>));
-     tolua_pushusertype(tolua_S,tolua_obj,"const std::unordered_map<int,Block>");
-    tolua_register_gc(tolua_S,lua_gettop(tolua_S));
-#endif
-   }
+   const std::unordered_map<int,Block>& tolua_ret = (const std::unordered_map<int,Block>&)  Block::getBlockIdMap();
+    tolua_pushusertype(tolua_S,(void*)&tolua_ret,"const std::unordered_map<int,Block>");
   }
  }
  return 1;
@@ -930,6 +943,7 @@ TOLUA_API int tolua_Block_open (lua_State* tolua_S)
    tolua_variable(tolua_S,"lightValueR",tolua_get_Block_lightValueR,tolua_set_Block_lightValueR);
    tolua_variable(tolua_S,"lightValueG",tolua_get_Block_lightValueG,tolua_set_Block_lightValueG);
    tolua_variable(tolua_S,"lightValueB",tolua_get_Block_lightValueB,tolua_set_Block_lightValueB);
+   tolua_variable(tolua_S,"rotationGroup",tolua_get_Block_rotationGroup,tolua_set_Block_rotationGroup);
    tolua_variable(tolua_S,"hardness",tolua_get_Block_hardness,tolua_set_Block_hardness);
    tolua_array(tolua_S,"textureId",tolua_get_Block_Block_textureId,tolua_set_Block_Block_textureId);
    tolua_function(tolua_S,"registerBlock",tolua_Block_Block_registerBlock00);

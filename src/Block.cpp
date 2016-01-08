@@ -16,6 +16,7 @@ Block::Block()
 	lightOpacity = 0;
 	lightValueSun = lightValueR = lightValueG = lightValueB = 0;
 	hardness = 1.0;
+	rotationGroup = 1;
 }
 
 void Block::registerBlock()

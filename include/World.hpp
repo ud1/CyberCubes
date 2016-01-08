@@ -86,7 +86,7 @@ public:
 	void updateLight(const std::vector<AddedBlockLight> &addedBlocks, const std::vector<math::ivec3> &removedBlocks);
 	bool getBlock(const math::vec3 &p, const math::vec3 &ray, float len, math::ivec3 &result, math::ivec3 &prev);
 	void move(math::BBox &box, const math::vec3 &delta);
-	bool putBlock(const math::ivec3 &v, CubeType c);
+	bool putBlock(const math::ivec3 &v, CubeType c, BlockData data);
 
 	bool isChunkCoordValid(const IntCoord &p) const;
 	
