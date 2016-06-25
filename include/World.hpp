@@ -64,13 +64,16 @@ public:
 	GLuint oqTriangleBufferObject = 0;
 	GLuint oqTriangleIndicesBufferObject = 0;
 	Shader oqShader;
-	Shader worldShaderPass1, worldShaderPass2;
+	Shader worldShaderPass1, worldShaderPass2, shadowMapPass;
 	float dayNightLightCoef;
+	math::vec3 sunDir;
 	math::vec3 fogColor;
 	float lightMultiplier = 1.0;
 
 	void create();
-	void renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks);
+	void renderShadowMap(const Camera &camera, const cyberCubes::Player &player, float scale);
+	void renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint detailTexture,
+			 GLuint shadow_map_texture1, GLuint shadow_map_texture2, GLuint box_positions_texture1, GLuint box_positions_texture2, float shadow_scale1, float shadow_scale2);
 	void renderPass2(const Camera &camera, const cyberCubes::Player &player, const std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint HSColorTexture);
 	float getMaxLightNearPoint(const math::vec3 &v);
 

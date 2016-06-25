@@ -81,7 +81,7 @@ void Chunk::put(const math::ivec3 &p, CubeType type)
 }
 
 
-bool Chunk::hasEdge(const math::ivec3 &p, Dir dir) const
+bool Chunk::hasEdge(const math::ivec3 &p, Dir dir, bool ignore_neib_chunks) const
 {
 	CubeType t = rawCubeAt(p);
 	if (!isSolid(t))
@@ -89,17 +89,41 @@ bool Chunk::hasEdge(const math::ivec3 &p, Dir dir) const
 	
 	math::ivec3 p2 = p;
 	if (dir == Dir::XN)
+	{
 		--p2.x;
+		if (ignore_neib_chunks && p2.x == -1)
+			return true;
+	}
 	else if (dir == Dir::XP)
+	{
 		++p2.x;
+		if (ignore_neib_chunks && p2.x == CHUNK_SIZE)
+			return true;
+	}
 	else if (dir == Dir::YN)
+	{
 		--p2.y;
+		if (ignore_neib_chunks && p2.y == -1)
+			return true;
+	}
 	else if (dir == Dir::YP)
+	{
 		++p2.y;
+		if (ignore_neib_chunks && p2.y == CHUNK_SIZE)
+			return true;
+	}
 	else if (dir == Dir::ZN)
+	{
 		--p2.z;
+		if (ignore_neib_chunks && p2.z == -1)
+			return true;
+	}
 	else if (dir == Dir::ZP)
+	{
 		++p2.z;
+		if (ignore_neib_chunks && p2.z == CHUNK_SIZE)
+			return true;
+	}
 	
 	CubeType t2 = cubeAt(p2);
 	return t2 != t && !isOpaque(t2);

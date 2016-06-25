@@ -40,7 +40,7 @@ struct WorldProviderTransaction
 	WorldProvider &provider;
 };
 
-World::World() : oqShader("oqShader"), worldShaderPass1("worldShaderPass1"), worldShaderPass2("worldShaderPass2")
+World::World() : oqShader("oqShader"), worldShaderPass1("worldShaderPass1"), worldShaderPass2("worldShaderPass2"), shadowMapPass("shadowMapShader")
 {
 	_renderTick = 0;
 	_maxRenderDataMemoryUse = 700 * 1024 * 1024;
@@ -1117,6 +1117,7 @@ void World::create()
 
 	worldShaderPass1.buildShaderProgram("wvs.glsl", "wgs.glsl", "wfs.glsl");
 	worldShaderPass2.buildShaderProgram("wvs.glsl", "wgs2.glsl", "wfs2.glsl");
+	shadowMapPass.buildShaderProgram("shadowvs.glsl", "shadowgs.glsl", "shadowfs.glsl");
 }
 
 void World::_linkChunk(Chunk *chunk, const IntCoord &pos)
@@ -1268,7 +1269,78 @@ Chunk *World::makeChunkLoadRequest(const IntCoord &coord)
 	return chunk;
 }
 
-void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks)
+extern int shadow_mode;
+
+void World::renderShadowMap(const Camera &camera, const cyberCubes::Player &player, float scale)
+{
+	math::mat4 depthProjectionMatrix = math::ortho<float>(-scale,scale,-scale,scale,0,500);
+	math::vec3 fw = camera.transform(1.0f, 0.0f, 0.0f);
+	math::vec3 shift = scale * (fw - math::dot(fw, sunDir)*sunDir);
+	//math::vec3 shift = scale * fw;
+	math::vec3 shadowCenter = camera.position + shift;
+	math::vec3 shadowEye = shadowCenter + sunDir*250.0f;
+	math::mat4 depthViewMatrix = math::lookAt(shadowEye, shadowCenter, math::vec3(0,0,1));
+	math::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix;
+
+	math::Frustum frustum;
+	frustum.update(depthMVP);
+	
+	glUseProgram(shadowMapPass.program);
+	
+	if (shadowMapPass.uniforms.count("depthMVP"))
+		glUniformMatrix4fv(shadowMapPass.uniforms["depthMVP"], 1, GL_FALSE, &depthMVP[0][0]);
+	
+	if (shadowMapPass.uniforms.count("mode"))
+			glUniform1i(shadowMapPass.uniforms["mode"], shadow_mode);
+	
+	int renderCount = 0;
+	for (IntCoord c : player.getChunks())
+	{
+		if (isChunkCanBeRendered(c, false))
+		{
+			math::vec3 bboxpos = i2f(c) * CHUNK_SIZE_F - math::vec3(0.5f, 0.5f, 0.5f);
+			math::BBox bbox(bboxpos, math::vec3(CHUNK_SIZE_F, CHUNK_SIZE_F, CHUNK_SIZE_F));
+
+			if (frustum.checkBBox(bbox) != math::IntersectionType::OUTSIDE)
+			{
+				math::vec3 pos = i2f(c) * CHUNK_SIZE_F;
+				glUniform3fv(shadowMapPass.uniforms["chunkPosition"], 1, &pos[0]);
+
+				Chunk &chunk = *chunks[c];
+					
+				if (!renderData.count(c))
+				{
+					renderData[c].reset(new RenderData);
+					chunk.isDirty = true;
+					
+					dirty1++;
+				}
+					
+				RenderData &rd = *renderData[c];
+
+				if (chunk.isDirty)
+				{
+					chunk.isDirty = false;
+					rd.addVertexData(chunk);
+					rd.uploadData();
+					
+					dirty2++;
+				}
+					
+				if (chunk.opaqueBlockCount)
+				{
+					rd.renderShadowMap(_renderTick, -sunDir);
+					++renderCount;
+				}
+			}
+		}
+	}
+	
+	//std::cout << "SHADOW RENDERED " << renderCount << " | " << scale << std::endl;
+}
+
+void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint detailTexture,
+			GLuint shadow_map_texture1, GLuint shadow_map_texture2, GLuint box_positions_texture1, GLuint box_positions_texture2, float shadow_scale1, float shadow_scale2)
 {
 	++_renderTick;
 	
@@ -1278,6 +1350,37 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 	math::mat4 MV = camera.getMatrix();
 	math::Frustum frustum;
 	frustum.update(MVP);
+	
+	
+	/////////////////
+	
+	math::mat4 depthProjectionMatrix1 = math::ortho<float>(-shadow_scale1,shadow_scale1,-shadow_scale1,shadow_scale1, 0,500);
+	math::mat4 depthProjectionMatrix2 = math::ortho<float>(-shadow_scale2,shadow_scale2,-shadow_scale2,shadow_scale2, 0,500);
+	
+	math::vec3 fw = camera.transform(1.0f, 0.0f, 0.0f);
+	
+	math::vec3 shift1 = shadow_scale1 * (fw - math::dot(fw, sunDir)*sunDir);
+	//math::vec3 shift1 = shadow_scale1 * fw;
+	math::vec3 shadowCenter1 = camera.position + shift1;
+	math::vec3 shadowEye1 = shadowCenter1 + sunDir*250.0f;
+	math::mat4 depthViewMatrix1 = math::lookAt(shadowEye1, shadowCenter1, math::vec3(0,0,1));
+	
+	math::vec3 shift2 = shadow_scale2 * (fw - math::dot(fw, sunDir)*sunDir);
+	//math::vec3 shift2 = shadow_scale2 * fw;
+	math::vec3 shadowCenter2 = camera.position + shift2;
+	math::vec3 shadowEye2 = shadowCenter2 + sunDir*250.0f;
+	math::mat4 depthViewMatrix2 = math::lookAt(shadowEye2, shadowCenter2, math::vec3(0,0,1));
+	
+	math::mat4 biasMatrix(
+			0.5, 0.0, 0.0, 0.0, 
+			0.0, 0.5, 0.0, 0.0,
+			0.0, 0.0, 0.5, 0.0,
+			0.5, 0.5, 0.5, 1.0
+		);
+	math::mat4 depthBiasMVP1 = biasMatrix * depthProjectionMatrix1 * depthViewMatrix1;
+	math::mat4 depthBiasMVP2 = biasMatrix * depthProjectionMatrix2 * depthViewMatrix2;
+	
+	/////////////////
 
 	typedef std::multimap<float, IntCoord> VisibleChunksMap;
 	VisibleChunksMap visibleChunks;
@@ -1451,6 +1554,71 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 		
 		if (worldShaderPass1.uniforms.count("fogFar"))
 			glUniform1f(worldShaderPass1.uniforms["fogFar"], player.getFogFar());
+		
+		if (worldShaderPass1.uniforms.count("blockSampler"))
+		{
+			glUniform1i(worldShaderPass1.uniforms["blockSampler"], 0);
+			glActiveTexture(GL_TEXTURE0 + 0);
+			glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
+		}
+		
+		if (worldShaderPass1.uniforms.count("detailSampler"))
+		{
+			glUniform1i(worldShaderPass1.uniforms["detailSampler"], 1);
+			glActiveTexture(GL_TEXTURE0 + 1);
+			glBindTexture(GL_TEXTURE_2D, detailTexture);
+		}
+		
+		if (worldShaderPass1.uniforms.count("shadowSampler1"))
+		{
+			glUniform1i(worldShaderPass1.uniforms["shadowSampler1"], 2);
+			glActiveTexture(GL_TEXTURE0 + 2);
+			glBindTexture(GL_TEXTURE_2D, shadow_map_texture1);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+		}
+		
+		if (worldShaderPass1.uniforms.count("shadowSampler2"))
+		{
+			glUniform1i(worldShaderPass1.uniforms["shadowSampler2"], 3);
+			glActiveTexture(GL_TEXTURE0 + 3);
+			glBindTexture(GL_TEXTURE_2D, shadow_map_texture2);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+		}
+		
+		if (worldShaderPass1.uniforms.count("shadowBoxPosSampler1"))
+		{
+			glUniform1i(worldShaderPass1.uniforms["shadowBoxPosSampler1"], 4);
+			glActiveTexture(GL_TEXTURE0 + 4);
+			glBindTexture(GL_TEXTURE_2D, box_positions_texture1);
+		}
+		
+		if (worldShaderPass1.uniforms.count("shadowBoxPosSampler2"))
+		{
+			glUniform1i(worldShaderPass1.uniforms["shadowBoxPosSampler2"], 5);
+			glActiveTexture(GL_TEXTURE0 + 5);
+			glBindTexture(GL_TEXTURE_2D, box_positions_texture2);
+		}
+		
+		
+		if (worldShaderPass1.uniforms.count("depthBiasMVP1"))
+			glUniformMatrix4fv(worldShaderPass1.uniforms["depthBiasMVP1"], 1, GL_FALSE, &depthBiasMVP1[0][0]);
+		if (worldShaderPass1.uniforms.count("depthBiasMVP2"))
+			glUniformMatrix4fv(worldShaderPass1.uniforms["depthBiasMVP2"], 1, GL_FALSE, &depthBiasMVP2[0][0]);
+		if (worldShaderPass1.uniforms.count("sunLightDir"))
+		{
+			math::vec3 sunLightDir = math::normalize(sunDir);
+			
+			glUniform3fv(worldShaderPass1.uniforms["sunLightDir"], 1, &sunLightDir[0]);
+		}
+		if (worldShaderPass1.uniforms.count("sunLightDirInv"))
+		{
+			math::vec3 sunLightDirInv = 1.0f/math::normalize(sunDir);
+			
+			glUniform3fv(worldShaderPass1.uniforms["sunLightDirInv"], 1, &sunLightDirInv[0]);
+		}
+		
+		if (worldShaderPass1.uniforms.count("mode"))
+			glUniform1i(worldShaderPass1.uniforms["mode"], shadow_mode);
 
 		for (size_t i = n; i < (n + l) && i < visibleChunksVector.size(); ++i)
 		{
@@ -1484,7 +1652,7 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 				
 				if (chunk.opaqueBlockCount)
 				{
-					rd.render(-1, camera.position - pos, _renderTick, true);
+					rd.render(-1, camera.position - pos, _renderTick, RenderKind::OPAQUE, math::vec3());
 					trisRendred += rd.trisRendered;
 				}
 				
@@ -1635,7 +1803,7 @@ void World::renderPass2(const Camera &camera, const cyberCubes::Player &player, 
 			glUniform1f(worldShaderPass2.uniforms["dayNightLightCoef"], dayNightLightCoef);
 		
 		RenderData &rd = *renderData[c];
-		rd.render(clipDirLocation, camera.position - pos, _renderTick, false);
+		rd.render(clipDirLocation, camera.position - pos, _renderTick, RenderKind::NON_OPAQUE, math::vec3());
 	}
 	
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

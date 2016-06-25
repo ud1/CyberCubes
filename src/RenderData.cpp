@@ -106,6 +106,9 @@ RenderData::~RenderData()
 	if (opaqueVao != 0)
 		glDeleteVertexArrays(1, &opaqueVao);
 	
+	if (shadowVao != 0)
+		glDeleteVertexArrays(1, &shadowVao);
+	
 	if (nonOpaqueVao != 0)
 		glDeleteVertexArrays(1, &nonOpaqueVao);
 }
@@ -307,6 +310,9 @@ void RenderData::uploadData()
 	
 	if (nonOpaqueVao == 0)
 		glGenVertexArrays(1, &nonOpaqueVao);
+	
+	if (shadowVao == 0)
+		glGenVertexArrays(1, &shadowVao);
 
 	glBindVertexArray(0);
 
@@ -317,14 +323,16 @@ void RenderData::uploadData()
 		glGenBuffers(1, &indexBufferObject);
 
 	int size = 0;
+	int shadowSize = 0;
 	for (int i = 0; i < 6; ++i)
 	{
 		size += opaqueVertices[i].size();
+		shadowSize += shadowMapVertices[i].size();
 	}
 	size += nonOpaqueVertices.size();
 
 	glBindBuffer(GL_ARRAY_BUFFER, triangleBufferObject); //we're "using" this one now
-	glBufferData(GL_ARRAY_BUFFER, size * sizeof(Vertex), NULL, GL_STATIC_DRAW); //formatting the data for the buffer
+	glBufferData(GL_ARRAY_BUFFER, size * sizeof(Vertex) + shadowSize*sizeof(ShadowMapVertex), NULL, GL_STATIC_DRAW); //formatting the data for the buffer
 	GLintptr offset = 0;
 	for (int i = 0; i < 6; ++i)
 	{
@@ -338,7 +346,21 @@ void RenderData::uploadData()
 	if (nonOpaqueVertices.size() > 0)
 	{
 		glBufferSubData(GL_ARRAY_BUFFER, offset, nonOpaqueVertices.size() * sizeof(Vertex), &nonOpaqueVertices[0]);
-		
+		offset += nonOpaqueVertices.size() * sizeof(Vertex);
+	}
+	
+	shadowMapVerticesOffset = offset;
+	for (int i = 0; i < 6; ++i)
+	{
+		if (shadowMapVertices[i].size())
+		{
+			glBufferSubData(GL_ARRAY_BUFFER, offset, shadowMapVertices[i].size() * sizeof(ShadowMapVertex), &shadowMapVertices[i][0]);
+			offset += shadowMapVertices[i].size() * sizeof(ShadowMapVertex);
+		}
+	}
+	
+	if (nonOpaqueVertices.size() > 0)
+	{
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferObject);
 		int count = 0;
 		for (int i = 0; i < 8; ++i)
@@ -347,18 +369,21 @@ void RenderData::uploadData()
 		}
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(uint16_t), NULL, GL_STATIC_DRAW);
 		
-		offset = 0;
+		GLintptr index_offset = 0;
 		for (int i = 0; i < 8; ++i)
 		{
 			if (nonOpaqueIndices[i].size())
-				glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset, nonOpaqueIndices[i].size() * sizeof(uint16_t), &nonOpaqueIndices[i][0]);
-			offset += nonOpaqueIndices[i].size() * sizeof(uint16_t);
+				glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, index_offset, nonOpaqueIndices[i].size() * sizeof(uint16_t), &nonOpaqueIndices[i][0]);
+			index_offset += nonOpaqueIndices[i].size() * sizeof(uint16_t);
 		}
 	}
 
 	for (int i = 0; i < 2; ++i)
 	{
-		glBindVertexArray(i == 0 ? opaqueVao : nonOpaqueVao);
+		if (i == 0)
+			glBindVertexArray(opaqueVao);
+		else if (i == 1)
+			glBindVertexArray(nonOpaqueVao);
 		
 		glBindBuffer(GL_ARRAY_BUFFER, triangleBufferObject);
 
@@ -368,20 +393,22 @@ void RenderData::uploadData()
 		glEnableVertexAttribArray(1);
 		glVertexAttribIPointer(1, 1, GL_UNSIGNED_BYTE, sizeof(Vertex), &((Vertex *)nullptr)->normalIndex);
 		
+
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 2, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->colorH);
-		
+			
 		glEnableVertexAttribArray(3);
 		glVertexAttribIPointer(3, 2, GL_UNSIGNED_BYTE, sizeof(Vertex), &((Vertex *)nullptr)->rotation);
-		
+			
 		glEnableVertexAttribArray(4);
 		glVertexAttribIPointer(4, 1, GL_SHORT, sizeof(Vertex), &((Vertex *)nullptr)->textureId);
-		
+			
 		glEnableVertexAttribArray(5);
 		glVertexAttribPointer(5, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->l1);
-		
+			
 		glEnableVertexAttribArray(6);
 		glVertexAttribPointer(6, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Vertex), &((Vertex *)nullptr)->sl1);
+
 		
 		if (i == 1)
 		{
@@ -389,9 +416,16 @@ void RenderData::uploadData()
 		}
 	}
 	
+	glBindVertexArray(shadowVao);
+	glBindBuffer(GL_ARRAY_BUFFER, triangleBufferObject);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(ShadowMapVertex), reinterpret_cast<void *>(shadowMapVerticesOffset));
+	
 	glBindVertexArray(0);
 
-	std::cout << "vertices " << size << std::endl;
+	std::cout << "vertices " << size << " " << shadowSize << std::endl;
 	printf("glError: %d\n", glGetError());
 }
 
@@ -413,14 +447,57 @@ typedef struct {
 	GLuint baseInstance;
 } DrawArraysIndirectCommand;
 
-void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick, bool opaque)
+void RenderData::renderShadowMap(Tick tick, const math::vec3 &lookDir)
+{
+	GLint mdFirst[6];
+	GLsizei mdCount[6];
+	int k = 0;
+	
+	int offset = 0;
+	for (int i = 0; i < 6; ++i)
+	{
+		bool skipRender = 
+			(i == (int) Dir::XN && lookDir.x < 0.0f) ||
+			(i == (int) Dir::XP && lookDir.x > 0.0f) ||
+			(i == (int) Dir::YN && lookDir.y < 0.0f) ||
+			(i == (int) Dir::YP && lookDir.y > 0.0f) ||
+			(i == (int) Dir::ZN && lookDir.z < 0.0f) ||
+			(i == (int) Dir::ZP && lookDir.z > 0.0f);
+			
+		//skipRender = false;
+		
+		if (!skipRender && shadowMapVertices[i].size())
+		{
+			mdFirst[k] = offset;
+			mdCount[k] = shadowMapVertices[i].size();
+			
+			//std::cout << "RENDER SH " << k << " " << mdFirst[k] << " " << mdCount[k] << std::endl;
+			
+			++k;
+		}
+		
+		offset += shadowMapVertices[i].size();
+	}
+	
+	if (k)
+	{
+		glBindVertexArray(shadowVao);
+		glMultiDrawArrays(GL_POINTS, mdFirst, mdCount, k);
+		glBindVertexArray(0);
+	}
+}
+
+void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick, RenderKind render_kind, const math::vec3 &lookDir)
 {
 	_renderTick = tick;
 	
 	math::ivec3 eyePos = math::ivec3(std::floor(eye.x + 0.5f), std::floor(eye.y + 0.5f), std::floor(eye.z + 0.5f));
 	eyePos = math::clamp(eyePos, math::ivec3(-1, -1, -1), math::ivec3(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE)) + math::ivec3(1, 1, 1);
 
-	glBindVertexArray(opaque ? opaqueVao : nonOpaqueVao);
+	if (render_kind == RenderKind::OPAQUE)
+		glBindVertexArray(opaqueVao);
+	else if (render_kind == RenderKind::NON_OPAQUE)
+		glBindVertexArray(nonOpaqueVao);
 
 	int indexOffset = 0;
 	
@@ -431,37 +508,51 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 	int k = 0;
 	for (int i = 0 ; i < 6; ++i)
 	{
-
-		if (opaque && !opaqueVertices[i].empty())
+		bool skipRender = false;
+		if (render_kind == RenderKind::SHADOW)
 		{
-			int delta;
+			skipRender = 
+				(i == (int) Dir::XN && lookDir.x < 0.0f) ||
+				(i == (int) Dir::XP && lookDir.x > 0.0f) ||
+				(i == (int) Dir::YN && lookDir.y < 0.0f) ||
+				(i == (int) Dir::YP && lookDir.y > 0.0f) ||
+				(i == (int) Dir::ZN && lookDir.z < 0.0f) ||
+				(i == (int) Dir::ZP && lookDir.z > 0.0f);
+		}
 		
-			if (i == (int) Dir::XN)
+		if ((render_kind == RenderKind::OPAQUE || render_kind == RenderKind::SHADOW) && !opaqueVertices[i].empty())
+		{
+			int delta = 0;
+		
+			if (render_kind != RenderKind::SHADOW)
 			{
-				delta = eyePos.x;
-			}
-			else if (i == (int) Dir::XP)
-			{
-				delta = CHUNK_SIZE + 1 - eyePos.x;
-			}
-			else if (i == (int) Dir::YN)
-			{
-				delta = eyePos.y;
-			}
-			else if (i == (int) Dir::YP)
-			{
-				delta = CHUNK_SIZE + 1 - eyePos.y;
-			}
-			else if (i == (int) Dir::ZN)
-			{
-				delta = eyePos.z;
-			}
-			else if (i == (int) Dir::ZP)
-			{
-				delta = CHUNK_SIZE + 1 - eyePos.z;
+				if (i == (int) Dir::XN)
+				{
+					delta = eyePos.x;
+				}
+				else if (i == (int) Dir::XP)
+				{
+					delta = CHUNK_SIZE + 1 - eyePos.x;
+				}
+				else if (i == (int) Dir::YN)
+				{
+					delta = eyePos.y;
+				}
+				else if (i == (int) Dir::YP)
+				{
+					delta = CHUNK_SIZE + 1 - eyePos.y;
+				}
+				else if (i == (int) Dir::ZN)
+				{
+					delta = eyePos.z;
+				}
+				else if (i == (int) Dir::ZP)
+				{
+					delta = CHUNK_SIZE + 1 - eyePos.z;
+				}
 			}
 			
-			if (delta < (int) CHUNK_SIZE)
+			if (delta < (int) CHUNK_SIZE && !skipRender)
 			{
 				GLsizei count = opaqueVertices[i].size() - opaqueLayerIndices[i][delta];
 				total += count;
@@ -479,7 +570,7 @@ void RenderData::render(GLint clipDirLocation, const math::vec3 &eye, Tick tick,
 	if (k)
 		glMultiDrawArrays(GL_POINTS, mdFirst, mdCount, k);
 	
-	if (!opaque && !nonOpaqueVertices.empty())
+	if ((render_kind == RenderKind::NON_OPAQUE) && !nonOpaqueVertices.empty())
 	{
 		for (int k = 0; k < 8; ++k)
 		{
@@ -535,6 +626,95 @@ int getTextureId(CubeType cubeType, Dir dir, int rot)
 	return textureId;
 }
 
+void RenderData::addShadowMapLayer(Dir dir, char *layerBitMap, unsigned dim3)
+{
+	int n = 0;
+	for (int row = 0; row < CHUNK_SIZE; ++row)
+	{
+		for (int col = 0; col < CHUNK_SIZE; )
+		{
+			if (layerBitMap[n])
+			{
+				int w = 1;
+				for (; (col + w) < CHUNK_SIZE && w < 8 && layerBitMap[n + w]; ++w) {}
+				
+				int h = 1;
+				for (; (row + h) < CHUNK_SIZE && h < 8; ++h)
+				{
+					for (int k = 0; k < w; ++k)
+					{
+						assert(n + k + h*CHUNK_SIZE < CHUNK_SIZE*CHUNK_SIZE);
+						if (!layerBitMap[n + k + h*CHUNK_SIZE])
+						{
+							goto label_height_found;
+						}
+					}
+				}
+				
+				label_height_found:
+				ShadowMapVertex vertex;
+				if (dir == Dir::XN)
+				{
+					vertex.dim1pw = dim3;
+					vertex.dim2pw = row;
+					vertex.dim3pn = col;
+				}
+				else if (dir == Dir::XP)
+				{
+					vertex.dim1pw = CHUNK_SIZE - 1 - dim3;
+					vertex.dim2pw = row;
+					vertex.dim3pn = col;
+				}
+				else if (dir == Dir::YN)
+				{
+					vertex.dim1pw = row;
+					vertex.dim2pw = dim3;
+					vertex.dim3pn = col;
+				}
+				else if (dir == Dir::YP)
+				{
+					vertex.dim1pw = row;
+					vertex.dim2pw = CHUNK_SIZE - 1 - dim3;
+					vertex.dim3pn = col;
+				}
+				else if (dir == Dir::ZN)
+				{
+					vertex.dim1pw = row;
+					vertex.dim2pw = col;
+					vertex.dim3pn = dim3;
+				}
+				else if (dir == Dir::ZP)
+				{
+					vertex.dim1pw = row;
+					vertex.dim2pw = col;
+					vertex.dim3pn = CHUNK_SIZE - 1 - dim3;
+				}
+				vertex.dim1pw = vertex.dim1pw*8 + h - 1;
+				vertex.dim2pw = vertex.dim2pw*8 + w - 1;
+				vertex.dim3pn = vertex.dim3pn*8 + (int) dir;
+				shadowMapVertices[(int) dir].push_back(vertex);
+				
+				for (int d2 = 0; d2 < h; ++d2)
+				{
+					for (int d1 = 0; d1 < w; ++d1)
+					{
+						assert(n + d1 + d2*CHUNK_SIZE < CHUNK_SIZE*CHUNK_SIZE);
+						layerBitMap[n + d1 + d2*CHUNK_SIZE] = 0;
+					}
+				}
+				
+				col += w;
+				n += w;
+			}
+			else
+			{
+				++col;
+				++n;
+			}
+		}
+	}
+}
+
 void RenderData::addVertexData(const Chunk &chunk)
 {
 	for (int i = 0 ; i < 6; ++i)
@@ -542,6 +722,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 		opaqueLayerIndices[i].clear();
 		opaqueVertices[i].clear();
 		opaqueLayerIndices[i].resize(CHUNK_SIZE);
+		shadowMapVertices[i].clear();
 	}
 	
 	for (int i = 0; i < 8; ++i)
@@ -554,6 +735,8 @@ void RenderData::addVertexData(const Chunk &chunk)
 	bool nonOpaqueExists = false;
 	for (unsigned int i = 0; i < CHUNK_SIZE; ++i)
 	{
+		char bitMask[6*CHUNK_SIZE*CHUNK_SIZE] = {0};
+		
 		for (int l = 0 ; l < 6; ++l)
 		{
 			opaqueLayerIndices[l][i] = opaqueVertices[l].size();
@@ -568,7 +751,7 @@ void RenderData::addVertexData(const Chunk &chunk)
 				
 				math::ivec3 p = math::ivec3(i, j, k);
 				
-				if (chunk.hasEdge(p, Dir::XN))
+				if (chunk.hasEdge(p, Dir::XN, false))
 				{
 					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
 					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::XN, rot);
@@ -579,9 +762,14 @@ void RenderData::addVertexData(const Chunk &chunk)
 						nonOpaqueExists = true;
 					}
 				}
+				
+				if (chunk.hasEdge(p, Dir::XN, true))
+				{
+					bitMask[0*CHUNK_SIZE*CHUNK_SIZE + j*CHUNK_SIZE + k] = 1;
+				}
 
 				p = math::ivec3(CHUNK_SIZE - 1 - i, j, k);
-				if (chunk.hasEdge(p, Dir::XP))
+				if (chunk.hasEdge(p, Dir::XP, false))
 				{
 					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
 					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::XP, rot);
@@ -593,8 +781,13 @@ void RenderData::addVertexData(const Chunk &chunk)
 					}
 				}
 				
+				if (chunk.hasEdge(p, Dir::XP, true))
+				{
+					bitMask[1*CHUNK_SIZE*CHUNK_SIZE + j*CHUNK_SIZE + k] = 1;
+				}
+				
 				p = math::ivec3(j, i, k);
-				if (chunk.hasEdge(p, Dir::YN))
+				if (chunk.hasEdge(p, Dir::YN, false))
 				{
 					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
 					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::YN, rot);
@@ -606,8 +799,13 @@ void RenderData::addVertexData(const Chunk &chunk)
 					}
 				}
 				
+				if (chunk.hasEdge(p, Dir::YN, true))
+				{
+					bitMask[2*CHUNK_SIZE*CHUNK_SIZE + j*CHUNK_SIZE + k] = 1;
+				}
+				
 				p = math::ivec3(j, CHUNK_SIZE - 1 - i, k);
-				if (chunk.hasEdge(p, Dir::YP))
+				if (chunk.hasEdge(p, Dir::YP, false))
 				{
 					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
 					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::YP, rot);
@@ -619,8 +817,13 @@ void RenderData::addVertexData(const Chunk &chunk)
 					}
 				}
 				
+				if (chunk.hasEdge(p, Dir::YP, true))
+				{
+					bitMask[3*CHUNK_SIZE*CHUNK_SIZE + j*CHUNK_SIZE + k] = 1;
+				}
+				
 				p = math::ivec3(j, k, i);
-				if (chunk.hasEdge(p, Dir::ZN))
+				if (chunk.hasEdge(p, Dir::ZN, false))
 				{
 					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
 					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::ZN, rot);
@@ -632,8 +835,13 @@ void RenderData::addVertexData(const Chunk &chunk)
 					}
 				}
 				
+				if (chunk.hasEdge(p, Dir::ZN, true))
+				{
+					bitMask[4*CHUNK_SIZE*CHUNK_SIZE + j*CHUNK_SIZE + k] = 1;
+				}
+				
 				p = math::ivec3(j, k, CHUNK_SIZE - 1 - i);
-				if (chunk.hasEdge(p, Dir::ZP))
+				if (chunk.hasEdge(p, Dir::ZP, false))
 				{
 					int rot = Chunk::decodeRotation(chunk.getBlockData(p));
 					unsigned char quadRot = RotationMatrices::getInstance().getQuadRotation(Dir::ZP, rot);
@@ -644,7 +852,17 @@ void RenderData::addVertexData(const Chunk &chunk)
 						nonOpaqueExists = true;
 					}
 				}
+				
+				if (chunk.hasEdge(p, Dir::ZP, true))
+				{
+					bitMask[5*CHUNK_SIZE*CHUNK_SIZE + j*CHUNK_SIZE + k] = 1;
+				}
 			}
+		}
+		
+		for (int dir = 0; dir < 6; ++dir)
+		{
+			addShadowMapLayer((Dir) dir, bitMask + dir*CHUNK_SIZE*CHUNK_SIZE, i);
 		}
 	}
 	
@@ -697,17 +915,6 @@ void RenderData::addVertexData(const Chunk &chunk)
 						else if (!zp && facesInds[ind + 4] >= 0)
 							nonOpaqueIndices[d].push_back(facesInds[ind + 4]);
 					}
-				}
-			}
-		}
-		
-		for (int i = 0; i < 8; ++i)
-		{
-			if (nonOpaqueIndices[i].size() < 10)
-			{
-				for (int j = 0; j < nonOpaqueIndices[i].size(); ++j)
-				{
-					std::cout << "INT " << j << " " << nonOpaqueIndices[i][j] << std::endl;
 				}
 			}
 		}

@@ -31,6 +31,7 @@
 #include "BlockRenderer.hpp"
 #include "SoundSystem.h"
 #include "Input.hpp"
+#include "ModelRenderer.hpp"
 
 static const struct
 {
@@ -229,6 +230,7 @@ using namespace cyberCubes::render;
 namespace
 {
 	double g_timeElapsed = 0;
+	double g_shadowTime[2] = {0};
 	
 	Inventory *inventory;
 	bool inventoryShow = false;
@@ -238,8 +240,12 @@ namespace
 	GLuint crosshairVao = 0;
 	GLuint crosshairBufferObject = 0;
 	Shader crosshairShader("crosshairShader");
+	Shader quadShader("quadShader1");
+	Shader quadShader2("quadShader2");
+	Shader wireframeBox("wireframeBoxShader");
+	Shader highlightSideShader("highlightSideShader");
 	
-	bool renderHighlight;
+	GLuint higlightSideVao = 0;
 }
 
 GLuint blockTexture;
@@ -301,86 +307,72 @@ void renderCrosshair(SDL_Window *window)
 	checkGLError("10");
 }
 
-int main()
+struct Globals
 {
-	if (!initConf("config.lua"))
-		return 1;
-
-	createColorMap();
-
-	SDL_Surface *detailTextureImage = IMG_Load("textures/detail.jpg");
-	//return 0;
-
-	FloatSmoothing lightMultiplierSmoothing(1.0f, 1.0f);
-
 	int width = 1500;
 	int height = 1000;
-
-	if (SDL_Init(SDL_INIT_VIDEO) < 0)
-		return 1;
-
-	SDL_Window *window = SDL_CreateWindow("My Game Window",
-										  SDL_WINDOWPOS_UNDEFINED,
-										  SDL_WINDOWPOS_UNDEFINED,
-										  width, height,
-										  SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
-
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 4);
-
-	SDL_GLContext glContext = SDL_GL_CreateContext(window);
-
-	if (glContext == NULL)
-	{
-		printf("There was an error creating the OpenGL context!\n");
-		return 0;
-	}
-
-	const unsigned char *version = glGetString(GL_VERSION);
-
-	if (version == NULL)
-	{
-		printf("There was an error creating the OpenGL context!\n");
-		return 1;
-	}
-
-	printf("Version %s", version);
-
-	SDL_GL_MakeCurrent(window, glContext);
-
-
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	SDL_GL_SetSwapInterval(1);
-
-	//MUST make a context AND make it current BEFORE glewInit()!
-	glewExperimental = GL_TRUE;
-	GLenum glew_status = glewInit();
-
-	if (glew_status != 0)
-	{
-		fprintf(stderr, "Error: %s\n", glewGetErrorString(glew_status));
-		return 1;
-	}
-
-	World world;
-	world.create();
+	int shadowMapSize = 1024;
 	
-	SoundSystem soundSystem;
-	soundSystem.initialize();
-	//soundSystem.playBackground("music/Andrew_Seistrup_-_A_Glimpse_of_Who_She_Was.ogg", 1.0);
+	GLuint	detailTexture;
+	GLuint	frameBufferTexture1, frameBufferTexture2, frameBufferFinalTexture, HSColorTexture;
+	
+	model::Model testModel;
+	
+	
+} globals;
 
-	Player player(&world);
+void loadDetailTexture()
+{
+	SDL_Surface *detailTextureImage = IMG_Load("textures/detail.jpg");
+	
+	glGenTextures(1, &globals.detailTexture);
+	glBindTexture(GL_TEXTURE_2D, globals.detailTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, detailTextureImage->w, detailTextureImage->h, 0, GL_RGB, GL_UNSIGNED_BYTE, detailTextureImage->pixels);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	
+	SDL_FreeSurface(detailTextureImage);
+}
 
-	Shader quadShader("quadShader1");
+void createTextures()
+{
+	glGenTextures(1, &globals.frameBufferTexture1);
+	glBindTexture(GL_TEXTURE_RECTANGLE, globals.frameBufferTexture1);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, globals.width, globals.height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+	glGenTextures(1, &globals.frameBufferTexture2);
+	glBindTexture(GL_TEXTURE_RECTANGLE, globals.frameBufferTexture2);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, globals.width, globals.height, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	
+	glGenTextures(1, &globals.frameBufferFinalTexture);
+	glBindTexture(GL_TEXTURE_RECTANGLE, globals.frameBufferFinalTexture);
+	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, globals.width, globals.height, 0, GL_RGB, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+	
+	glGenTextures(1, &globals.HSColorTexture);
+	glBindTexture(GL_TEXTURE_2D, globals.HSColorTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, colorMap);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+int loadShaders()
+{
 	if (!quadShader.buildShaderProgram("quadvs1.glsl", "quadfs1.glsl"))
 	{
 		SDL_Quit();
 		return 0;
 	}
-
-	Shader quadShader2("quadShader2");
 
 	if (!quadShader2.buildShaderProgram("quadvs1.glsl", "quadfs2.glsl"))
 	{
@@ -388,16 +380,13 @@ int main()
 		return 0;
 	}
 
-	Shader wireframeBox("wireframeBoxShader");
-
+	
 	if (!wireframeBox.buildShaderProgram("wireframeBoxvs.glsl", "wireframeBoxgs.glsl", "wireframeBoxfs.glsl"))
 	{
 		SDL_Quit();
 		return 0;
 	}
 	
-	Shader highlightSideShader("highlightSideShader");
-
 	if (!highlightSideShader.buildShaderProgram("highlightSidevs.glsl", "highlightSidegs.glsl", "highlightSidefs.glsl"))
 	{
 		SDL_Quit();
@@ -409,91 +398,10 @@ int main()
 		SDL_Quit();
 		return 0;
 	}
+}
 
-	camera.position = math::vec3(0.0f, 0.0f, 300.0f);
-	camera.aspectRatio = (float) width / (float) height;
-	math::Frustum frustum;
-
-	SDL_SetRelativeMouseMode(SDL_TRUE);
-
-	boost::timer::cpu_timer timer;
-
-	glEnable(GL_DEPTH_TEST);
-
-	GLuint frameBuffer;
-	glGenFramebuffers(1, &frameBuffer);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
-	glViewport(0, 0, width, height);
-
-	GLuint	detailTexture;
-	glGenTextures(1, &detailTexture);
-	glBindTexture(GL_TEXTURE_2D, detailTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, detailTextureImage->w, detailTextureImage->h, 0, GL_RGB, GL_UNSIGNED_BYTE, detailTextureImage->pixels);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glGenerateMipmap(GL_TEXTURE_2D);
-
-
-	GLuint	frameBufferTexture1;
-	glGenTextures(1, &frameBufferTexture1);
-	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture1);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture1, 0);
-
-	GLuint	frameBufferTexture2;
-	glGenTextures(1, &frameBufferTexture2);
-	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture2);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
-	
-	GLuint	frameBufferTexture3;
-	glGenTextures(1, &frameBufferTexture3);
-	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture3);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_RECTANGLE, frameBufferTexture3, 0);
-
-
-	GLuint	frameBufferMaterialTexture;
-	glGenTextures(1, &frameBufferMaterialTexture);
-	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_R16I, width, height, 0, GL_RED_INTEGER, GL_SHORT, NULL);
-	//glTexImage2D    ( GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL );
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture, 0);
-
-	GLuint	depth_tex;
-	glGenTextures(1, &depth_tex);
-	glBindTexture(GL_TEXTURE_2D, depth_tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-
-	//NULL means reserve texture memory, but texels are undefined
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_tex, 0);
-
-	GLuint	frameBufferFinalTexture;
-	glGenTextures(1, &frameBufferFinalTexture);
-	glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferFinalTexture);
-	glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-	//glTexParameteri ( GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-
+void loadTextures()
+{
 	int blockTextureId = 0;
 	const int MAX_BLOCK_TYPES = 40000;
 	std::map<int, SDL_Surface *> images;
@@ -518,7 +426,7 @@ int main()
 
 					if (!image || image->w != 16 || image->h != 16)
 					{
-						std::cout << "Wrong image " << type << std::endl;
+						std::cout << "Invalid image attributes " << type << std::endl;
 
 						block->textureId[i] = 0;
 						textureNameIdMap[textureName] = 0;
@@ -578,19 +486,342 @@ int main()
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
 	glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
 	std::cout << "Anisotropy level " << aniso << std::endl;
+}
 
-	GLuint HSColorTexture;
-	glGenTextures(1, &HSColorTexture);
-	glBindTexture(GL_TEXTURE_2D, HSColorTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 256, 256, 0, GL_RGB, GL_UNSIGNED_BYTE, colorMap);
+void generateModel()
+{
+	model::ModelBox box;
+	model::Model &testModel = globals.testModel;
+	
+	box.position = math::vec3(-1.0, -3.0, -14.0f);
+	box.offset = math::vec3(-4.0, -3.0, 3.0f);
+	box.size = math::vec3(8.0, 7.0, -6.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = M_PI / 2.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(0.0, 2.0, -14.0f);
+	box.offset = math::vec3(-4.0, -3.0, 2.0f);
+	box.size = math::vec3(6.0, 6.0, -9.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = M_PI / 2.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(-1.0, -7.0, -13.5f);
+	box.offset = math::vec3(-3.0, -2.0, 3.0f);
+	box.size = math::vec3(6.0, 4.0, -6.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(-0.5f, -7.0, -13.5f);
+	box.offset = math::vec3(-2.0f, -5.0f, 0.0f);
+	box.size = math::vec3(3.0, 4.0, -3.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(-1.0f, -7.0, -13.5f);
+	box.offset = math::vec3(1.0f, 0.0f, 5.0f);
+	box.size = math::vec3(2.0, 1.0, -2.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(-1.0f, -7.0, -13.5f);
+	box.offset = math::vec3(-3.0f, 0.0f, 5.0f);
+	box.size = math::vec3(2.0, 1.0, -2.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(0.5f, -4.0, -16.0f);
+	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
+	box.size = math::vec3(2.0, 2.0, -8.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(-2.5f, -4.0, -16.0f);
+	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
+	box.size = math::vec3(2.0, 2.0, -8.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(0.5f, 7.0, -16.0f);
+	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
+	box.size = math::vec3(2.0, 2.0, -8.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(-2.5f, 7.0, -16.0f);
+	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
+	box.size = math::vec3(2.0, 2.0, -8.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 0.0;
+	testModel.boxes.push_back(box);
+	
+	box.position = math::vec3(-1.0f, 8.0, -12.0f);
+	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
+	box.size = math::vec3(2.0, 2.0, -8.0f);
+	box.rotationFw = box.rotationUp = 0.0f;
+	box.rotationR = 1.13f;
+	testModel.boxes.push_back(box);
+	
+	
+	testModel.position = math::vec3(0.0, 0.0, 310.0f);
+}
+
+void renderHighlight(const math::ivec3 &bpos, const math::ivec3 &prevBPos)
+{
+	glBindVertexArray(higlightSideVao);
+						checkGLError("9_1");
+						glUseProgram(highlightSideShader.program);
+						glEnable(GL_DEPTH_TEST);
+						if (highlightSideShader.uniforms.count("MVP"))
+						{
+							math::mat4 MVP = camera.getVP();
+							glUniformMatrix4fv(highlightSideShader.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
+						}
+						
+						if (highlightSideShader.uniforms.count("position"))
+						{
+							math::vec3 pos = (math::vec3) prevBPos;
+							glUniform3fv(highlightSideShader.uniforms["position"], 1, &pos[0]);
+						}
+						
+						int normalIndex = 0;
+						if (bpos.x > prevBPos.x)
+							normalIndex = (int) Dir::XP;
+						else if (bpos.x < prevBPos.x)
+							normalIndex = (int) Dir::XN;
+						else if (bpos.y > prevBPos.y)
+							normalIndex = (int) Dir::YP;
+						else if (bpos.y < prevBPos.y)
+							normalIndex = (int) Dir::YN;
+						else if (bpos.z > prevBPos.z)
+							normalIndex = (int) Dir::ZP;
+						else if (bpos.z < prevBPos.z)
+							normalIndex = (int) Dir::ZN;
+						
+						if (highlightSideShader.uniforms.count("normalIndex"))
+						{
+							glUniform1i(highlightSideShader.uniforms["normalIndex"], normalIndex);
+						}
+						
+						if (highlightSideShader.uniforms.count("blockSampler"))
+						{
+							glUniform1i(highlightSideShader.uniforms["blockSampler"], 4);
+							glActiveTexture(GL_TEXTURE0 + 0);
+							glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
+						}
+
+						glPolygonOffset(-1.0, -1.0);
+						glEnable(GL_POLYGON_OFFSET_FILL);
+						glEnable(GL_BLEND);
+						glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						
+						checkGLError("9_2");
+						
+						glDrawArrays(GL_POINTS, 0, 1);
+						glDisable(GL_POLYGON_OFFSET_FILL);
+						glBindVertexArray(0);
+}
+
+int shadow_mode = 3;
+
+int main()
+{
+	if (!initConf("config.lua"))
+		return 1;
+
+	createColorMap();
+
+	
+	//return 0;
+
+	FloatSmoothing lightMultiplierSmoothing(1.0f, 1.0f);
+
+	
+
+	if (SDL_Init(SDL_INIT_VIDEO) < 0)
+		return 1;
+
+	SDL_Window *window = SDL_CreateWindow("My Game Window",
+										  SDL_WINDOWPOS_UNDEFINED,
+										  SDL_WINDOWPOS_UNDEFINED,
+										  globals.width, globals.height,
+										  SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
+
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+
+	SDL_GLContext glContext = SDL_GL_CreateContext(window);
+
+	if (glContext == NULL)
+	{
+		printf("There was an error creating the OpenGL context!\n");
+		return 0;
+	}
+
+	const unsigned char *version = glGetString(GL_VERSION);
+
+	if (version == NULL)
+	{
+		printf("There was an error creating the OpenGL context!\n");
+		return 1;
+	}
+
+	printf("Version %s\n", version);
+	
+	int textureUnits;
+	glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &textureUnits);
+	printf("Max texture units %d\n", textureUnits);
+
+	SDL_GL_MakeCurrent(window, glContext);
+
+
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetSwapInterval(1);
+
+	//MUST make a context AND make it current BEFORE glewInit()!
+	glewExperimental = GL_TRUE;
+	GLenum glew_status = glewInit();
+
+	if (glew_status != 0)
+	{
+		fprintf(stderr, "Error: %s\n", glewGetErrorString(glew_status));
+		return 1;
+	}
+
+	World world;
+	world.create();
+	
+	SoundSystem soundSystem;
+	soundSystem.initialize();
+	//soundSystem.playBackground("music/Andrew_Seistrup_-_A_Glimpse_of_Who_She_Was.ogg", 1.0);
+
+	Player player(&world);
+
+	loadShaders();
+
+	camera.position = math::vec3(0.0f, 0.0f, 300.0f);
+	camera.aspectRatio = (float) globals.width / (float) globals.height;
+	math::Frustum frustum;
+
+	SDL_SetRelativeMouseMode(SDL_TRUE);
+
+	boost::timer::cpu_timer timer;
+
+	glEnable(GL_DEPTH_TEST);
+
+	
+	loadDetailTexture();
+	createTextures();
+
+	
+
+
+	
+
+	GLuint	depth_tex;
+	glGenTextures(1, &depth_tex);
+	glBindTexture(GL_TEXTURE_2D, depth_tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	
+	//NULL means reserve texture memory, but texels are undefined
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, globals.width, globals.height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
+	
+
+	
+	
+	
+	
+	
+	// shadow map
+	GLuint shadow_map_texture1;
+	glGenTextures(1, &shadow_map_texture1);
+	glBindTexture(GL_TEXTURE_2D, shadow_map_texture1);
+	glTexImage2D(GL_TEXTURE_2D, 0,GL_DEPTH_COMPONENT16, globals.shadowMapSize, globals.shadowMapSize, 0,GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	GLfloat clampColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, clampColor);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	
+	GLuint shadow_map_texture2;
+	glGenTextures(1, &shadow_map_texture2);
+	glBindTexture(GL_TEXTURE_2D, shadow_map_texture2);
+	glTexImage2D(GL_TEXTURE_2D, 0,GL_DEPTH_COMPONENT16, globals.shadowMapSize, globals.shadowMapSize, 0,GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, clampColor);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	
+	GLuint box_positions_texture1;
+	glGenTextures(1, &box_positions_texture1);
+	glBindTexture(GL_TEXTURE_2D, box_positions_texture1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, globals.shadowMapSize, globals.shadowMapSize, 0, GL_RGB, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	
+	GLuint box_positions_texture2;
+	glGenTextures(1, &box_positions_texture2);
+	glBindTexture(GL_TEXTURE_2D, box_positions_texture2);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, globals.shadowMapSize, globals.shadowMapSize, 0, GL_RGB, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	
+	GLuint shadow_map_framebuffer = 0;
+	glGenFramebuffers(1, &shadow_map_framebuffer);
+	//glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_framebuffer);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_texture2, 0);
+	GLenum status;
+	/*status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+	switch (status)
+	{
+	case GL_FRAMEBUFFER_COMPLETE:
+		std::cout << "FBO shadow good" << std::endl;
+		break;
+
+	default:
+		std::cout << "FBO shadow error " << status << std::endl;
+		return 0;
+	}*/
+	
+	generateModel();
+	
+	
+
+	loadTextures();
+	
+	
 
 
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
+	GLuint frameBuffer;
+	glGenFramebuffers(1, &frameBuffer);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_tex, 0);
+	glViewport(0, 0, globals.width, globals.height);
+
+	//glDrawBuffer(GL_NONE);
+	//glReadBuffer(GL_NONE);
 
 	GLenum drawBuffers[] = {GL_COLOR_ATTACHMENT0,
 							GL_COLOR_ATTACHMENT1,
@@ -599,7 +830,6 @@ int main()
 						   };
 	glDrawBuffers(4, drawBuffers);
 
-	GLenum status;
 	status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
 	switch (status)
@@ -639,7 +869,7 @@ int main()
 	GLuint wireframeCubeVao = 0;
 	glGenVertexArrays(1, &wireframeCubeVao);
 	
-	GLuint higlightSideVao = 0;
+	
 	glGenVertexArrays(1, &higlightSideVao);
 	
 	glGenVertexArrays(1, &crosshairVao);
@@ -667,20 +897,71 @@ int main()
 	
 	BlockRenderer renderer;
 	inventory = new Inventory(*vg, renderer);
-	inventory->setWindowSize(width, height);
+	inventory->setWindowSize(globals.width, globals.height);
 	
-	GLuint timerQuery;
-	glGenQueries(1, &timerQuery);
+	GLuint timerQuery[3];
+	glGenQueries(3, &timerQuery[0]);
 	
 	inventory->refreshNEIItems();
 	
 	input::MainInput input(&world, inventory, &camera);
 	
+	////////////////////////////////
+	
+	
+	
+	
+	model::ModelRendererBuffer modelRendererBuffer;
+	model::ModelRenderer modelRenderer;
+	
+	
+	////////////////////////////////
+	Shader simpleShader("simpleShader");
+	simpleShader.buildShaderProgram("simplevs.glsl", "simplefs.glsl");
+	
+	// The quad's FBO. Used only for visualizing the shadowmap.
+	static const GLfloat g_quad_vertex_buffer_data[] = { 
+		-1.0f, -1.0f, 0.0f,
+		 1.0f, -1.0f, 0.0f,
+		-1.0f,  1.0f, 0.0f,
+		-1.0f,  1.0f, 0.0f,
+		 1.0f, -1.0f, 0.0f,
+		 1.0f,  1.0f, 0.0f,
+	};
+	
+	GLuint simpleVao = 0;
+	
+	GLuint quad_vertexbuffer = 0;
+	glGenVertexArrays(1, &simpleVao);
+	glBindVertexArray(simpleVao);
+	glGenBuffers(1, &quad_vertexbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+	
+	glBufferData(GL_ARRAY_BUFFER, sizeof(g_quad_vertex_buffer_data), g_quad_vertex_buffer_data, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(
+				0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
+				3,                  // size
+				GL_FLOAT,           // type
+				GL_FALSE,           // normalized?
+				0,                  // stride
+				(void*)0            // array buffer offset
+			);
+	glBindVertexArray(0);
+	
+
+
+	
+	
+	////////////////////////////////
+	
 	while (input.gameLoopRunning)
 	{
+		glViewport(0, 0, globals.width, globals.height);
+		
 		soundSystem.update();
 		
-		glBeginQuery(GL_TIME_ELAPSED, timerQuery);
+		//glBeginQuery(GL_TIME_ELAPSED, timerQuery);
 		
 		const boost::timer::cpu_times elapsed_times = timer.elapsed();
 		boost::timer::nanosecond_type const elapsed(elapsed_times.wall);
@@ -699,22 +980,74 @@ int main()
 		//world.dayNightLightCoef = (1.0 + std::cos(globalT / 20.0))/2.0;
 		world.dayNightLightCoef = 1.0f;
 		//std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
+		
+		float sunDirCoef = 0.1;
+		world.sunDir = math::vec3(cos(sunDirCoef*globalT), -sin(sunDirCoef*globalT), 1.0f);
+		//world.sunDir = math::vec3(1.0f, 1.0f, 1.0f);
+		//world.sunDir = math::vec3(0.1f, 1.0f, 1.0f);
+		
+		world.sunDir = math::normalize(world.sunDir);
 
 		std::vector<IntCoord> nonOpaqueChunks;
-		{
+		
+		float scale_shadow1 = 20.0f;
+		float scale_shadow2 = 80.0f;
+		
+		if (shadow_mode != 4)
+		{ // Shadow map
+			glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_framebuffer);
+			glPolygonOffset(1, 4.0);
+			glEnable(GL_POLYGON_OFFSET_FILL);
+			
+			
+			
+			glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_texture1, 0);
+			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, box_positions_texture1, 0);
+			glViewport(0, 0, globals.shadowMapSize, globals.shadowMapSize);
+			
+			/*glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_texture1, 0);
+
+			glDrawBuffer(GL_NONE); // No color buffer is drawn to.*/
+
+			// Always check that our framebuffer is ok
+			if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+				return -2;
+			
+			
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			
+			glBeginQuery(GL_TIME_ELAPSED, timerQuery[0]);
+			world.renderShadowMap(camera, player, scale_shadow1);
+			
+			glEndQuery(GL_TIME_ELAPSED);
+			//glDrawBuffer(GL_NONE); // No color buffer is drawn to.
+
+			
+			glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadow_map_texture2, 0);
+			glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, box_positions_texture2, 0);
+			
+			if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+				return -2;
+			
+			
+			glBeginQuery(GL_TIME_ELAPSED, timerQuery[1]);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			world.renderShadowMap(camera, player, scale_shadow2);
+			glDisable(GL_POLYGON_OFFSET_FILL);
+			
+			glEndQuery(GL_TIME_ELAPSED);
+			
+			glViewport(0, 0, globals.width, globals.height);
+		}
+		
+		glBeginQuery(GL_TIME_ELAPSED, timerQuery[2]);
+		
+		{	
 			checkGLError("1");
 			//boost::timer::auto_cpu_timer t;
 			glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferTexture1, 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, frameBufferTexture2, 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_RECTANGLE, frameBufferTexture3, 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture, 0);
-
-			//glDrawBuffer(GL_COLOR_ATTACHMENT0);
-			//glReadBuffer(GL_COLOR_ATTACHMENT0);
-			//GLenum drawBufs[] = {GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT1};
-
-			//glDrawBuffers(1, drawBufs);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, globals.frameBufferTexture1, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, globals.frameBufferTexture2, 0);
 
 			glEnable(GL_DEPTH_TEST);
 			glDepthMask(GL_TRUE);
@@ -726,14 +1059,14 @@ int main()
 			checkGLError("2");
 			//glEnable(GL_POLYGON_OFFSET_FILL);
 			player.updatePosition(camera.position);
-			world.renderPass1(camera, player, nonOpaqueChunks);
+			world.renderPass1(camera, player, nonOpaqueChunks, blockTexture, globals.detailTexture, shadow_map_texture1, shadow_map_texture2, box_positions_texture1, box_positions_texture2, scale_shadow1, scale_shadow2);
 			//glDisable(GL_POLYGON_OFFSET_FILL);
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_RECTANGLE, 0, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_RECTANGLE, 0, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_RECTANGLE, 0, 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, frameBufferFinalTexture, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, globals.frameBufferFinalTexture, 0);
 
 			//glFlush();
 			world.lightMultiplier = 1.0 / std::pow(0.02f, 1.0f - world.getMaxLightNearPoint(camera.position));
@@ -763,34 +1096,20 @@ int main()
 			{
 				glUniform1i(quadShader.uniforms["frameBufferTexture1"], 0);
 				glActiveTexture(GL_TEXTURE0 + 0);
-				glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture1);
+				glBindTexture(GL_TEXTURE_RECTANGLE, globals.frameBufferTexture1);
 			}
 
 			if (quadShader.uniforms.count("frameBufferTexture2"))
 			{
 				glUniform1i(quadShader.uniforms["frameBufferTexture2"], 1);
 				glActiveTexture(GL_TEXTURE0 + 1);
-				glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture2);
-			}
-			
-			if (quadShader.uniforms.count("frameBufferTexture3"))
-			{
-				glUniform1i(quadShader.uniforms["frameBufferTexture3"], 2);
-				glActiveTexture(GL_TEXTURE0 + 2);
-				glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferTexture3);
-			}
-
-			if (quadShader.uniforms.count("materialSampler"))
-			{
-				glUniform1i(quadShader.uniforms["materialSampler"], 3);
-				glActiveTexture(GL_TEXTURE0 + 3);
-				glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferMaterialTexture);
+				glBindTexture(GL_TEXTURE_RECTANGLE, globals.frameBufferTexture2);
 			}
 
 			if (quadShader.uniforms.count("blockSampler"))
 			{
-				glUniform1i(quadShader.uniforms["blockSampler"], 4);
-				glActiveTexture(GL_TEXTURE0 + 4);
+				glUniform1i(quadShader.uniforms["blockSampler"], 2);
+				glActiveTexture(GL_TEXTURE0 + 2);
 				glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
 			}
 
@@ -799,17 +1118,17 @@ int main()
 			if (quadShader.uniforms.count("HSColorSampler"))
 			{
 				//std::cout << "HSColorSampler " << HSColorTexture << std::endl;
-				glUniform1i(quadShader.uniforms["HSColorSampler"], 5);
-				glActiveTexture(GL_TEXTURE0 + 5);
-				glBindTexture(GL_TEXTURE_2D, HSColorTexture);
+				glUniform1i(quadShader.uniforms["HSColorSampler"], 3);
+				glActiveTexture(GL_TEXTURE0 + 3);
+				glBindTexture(GL_TEXTURE_2D, globals.HSColorTexture);
 			}
 
 			if (quadShader.uniforms.count("detailSampler"))
 			{
 				//std::cout << "HSColorSampler " << HSColorTexture << std::endl;
-				glUniform1i(quadShader.uniforms["detailSampler"], 6);
-				glActiveTexture(GL_TEXTURE0 + 6);
-				glBindTexture(GL_TEXTURE_2D, detailTexture);
+				glUniform1i(quadShader.uniforms["detailSampler"], 4);
+				glActiveTexture(GL_TEXTURE0 + 4);
+				glBindTexture(GL_TEXTURE_2D, globals.detailTexture);
 			}
 
 			checkGLError("6");
@@ -877,65 +1196,13 @@ int main()
 					glDepthMask(GL_FALSE);
 				}
 				
-				world.renderPass2(camera, player, nonOpaqueChunks, blockTexture, HSColorTexture);
+				world.renderPass2(camera, player, nonOpaqueChunks, blockTexture, globals.HSColorTexture);
 				
 				if (b)
 				{
-					if (renderHighlight)
-					{
-						glBindVertexArray(higlightSideVao);
-						checkGLError("9_1");
-						glUseProgram(highlightSideShader.program);
-						glEnable(GL_DEPTH_TEST);
-						if (highlightSideShader.uniforms.count("MVP"))
-						{
-							math::mat4 MVP = camera.getVP();
-							glUniformMatrix4fv(highlightSideShader.uniforms["MVP"], 1, GL_FALSE, &MVP[0][0]);
-						}
-						
-						if (highlightSideShader.uniforms.count("position"))
-						{
-							math::vec3 pos = (math::vec3) prevBPos;
-							glUniform3fv(highlightSideShader.uniforms["position"], 1, &pos[0]);
-						}
-						
-						int normalIndex = 0;
-						if (bpos.x > prevBPos.x)
-							normalIndex = (int) Dir::XP;
-						else if (bpos.x < prevBPos.x)
-							normalIndex = (int) Dir::XN;
-						else if (bpos.y > prevBPos.y)
-							normalIndex = (int) Dir::YP;
-						else if (bpos.y < prevBPos.y)
-							normalIndex = (int) Dir::YN;
-						else if (bpos.z > prevBPos.z)
-							normalIndex = (int) Dir::ZP;
-						else if (bpos.z < prevBPos.z)
-							normalIndex = (int) Dir::ZN;
-						
-						if (highlightSideShader.uniforms.count("normalIndex"))
-						{
-							glUniform1i(highlightSideShader.uniforms["normalIndex"], normalIndex);
-						}
-						
-						if (highlightSideShader.uniforms.count("blockSampler"))
-						{
-							glUniform1i(highlightSideShader.uniforms["blockSampler"], 4);
-							glActiveTexture(GL_TEXTURE0 + 0);
-							glBindTexture(GL_TEXTURE_2D_ARRAY, blockTexture);
-						}
 
-						glPolygonOffset(-1.0, -1.0);
-						glEnable(GL_POLYGON_OFFSET_FILL);
-						glEnable(GL_BLEND);
-						glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-						
-						checkGLError("9_2");
-						
-						glDrawArrays(GL_POINTS, 0, 1);
-						glDisable(GL_POLYGON_OFFSET_FILL);
-						glBindVertexArray(0);
-					}
+					//renderHighlight(bpos, prevBPos);
+					
 
 					if (input.isPlayerMode())
 					{
@@ -963,6 +1230,21 @@ int main()
 
 			checkGLError("9");
 			
+			
+			///////////////////////////
+			/*std::vector<model::Vertex> modelBuffer;
+			static float rt = 0.0f;
+			rt += 0.001f;
+			globals.testModel.boxes[0].rotationFw = rt;
+			globals.testModel.render(modelBuffer);
+			modelRendererBuffer.upload(modelBuffer);
+			modelRenderer.startRender();
+			modelRenderer.render(modelRendererBuffer, camera);
+			modelRenderer.finishRender();*/
+			
+			
+			//////////////////////////
+			
 			renderCrosshair(window);
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
@@ -980,7 +1262,7 @@ int main()
 			{
 				glUniform1i(quadShader2.uniforms["textureSampler"], 0);
 				glActiveTexture(GL_TEXTURE0 + 0);
-				glBindTexture(GL_TEXTURE_RECTANGLE, frameBufferFinalTexture);
+				glBindTexture(GL_TEXTURE_RECTANGLE, globals.frameBufferFinalTexture);
 			}
 
 			glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -992,16 +1274,38 @@ int main()
 			glFinish();
 		}
 		
+		{// render shadow texture
+			/*glViewport(0,0,512,512);
+			glUseProgram(simpleShader.program);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, shadow_map_texture2);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+			if (simpleShader.uniforms.count("shadow_map_texture"))
+				glUniform1i(simpleShader.uniforms["shadow_map_texture"], 0);
+			// 1rst attribute buffer : vertices
+			glBindVertexArray(simpleVao);
+			
+			glDrawArrays(GL_TRIANGLES, 0, 6); // 2*3 indices starting at 0 -> 2 triangles
+			glUseProgram(0);
+			glViewport(0, 0, globals.width, globals.height);*/
+		}
+		
 		glEndQuery(GL_TIME_ELAPSED);
 		
 		GLint available = 0;
 		while (!available) {
-			glGetQueryObjectiv(timerQuery, GL_QUERY_RESULT_AVAILABLE, &available);
+			glGetQueryObjectiv(timerQuery[0], GL_QUERY_RESULT_AVAILABLE, &available);
+			glGetQueryObjectiv(timerQuery[1], GL_QUERY_RESULT_AVAILABLE, &available);
+			glGetQueryObjectiv(timerQuery[2], GL_QUERY_RESULT_AVAILABLE, &available);
 		}
 		
-		GLuint64 timeElapsed;
-		glGetQueryObjectui64v(timerQuery, GL_QUERY_RESULT, &timeElapsed);
-		g_timeElapsed = g_timeElapsed * 0.95 + timeElapsed * 0.05;
+		GLuint64 timeElapsed[3];
+		glGetQueryObjectui64v(timerQuery[0], GL_QUERY_RESULT, &timeElapsed[0]);
+		glGetQueryObjectui64v(timerQuery[1], GL_QUERY_RESULT, &timeElapsed[1]);
+		glGetQueryObjectui64v(timerQuery[2], GL_QUERY_RESULT, &timeElapsed[2]);
+		g_timeElapsed = g_timeElapsed * 0.95 + timeElapsed[2] * 0.05;
+		g_shadowTime[0] = g_shadowTime[0] * 0.95 + timeElapsed[0] * 0.05;
+		g_shadowTime[1] = g_shadowTime[1] * 0.95 + timeElapsed[1] * 0.05;
 
 		render2d(window, vg);
 		
@@ -1031,6 +1335,17 @@ int main()
 			IMG_SavePNG(img, fileName.str().c_str());
 			SDL_FreeSurface(img);
 		}
+		
+		if (input.pressedKeys.count((SDLK_F5)))
+			shadow_mode = 0;
+		if (input.pressedKeys.count((SDLK_F6)))
+			shadow_mode = 1;
+		if (input.pressedKeys.count((SDLK_F7)))
+			shadow_mode = 2;
+		if (input.pressedKeys.count((SDLK_F8)))
+			shadow_mode = 3;
+		if (input.pressedKeys.count((SDLK_F9)))
+			shadow_mode = 4;
 	}
 
 	
@@ -1057,7 +1372,7 @@ void render2d(SDL_Window *window, NVGcontext* vg)
 	nvgFillColor(vg, nvgRGBA(50, 255, 50, 255));
 	
 	std::ostringstream oss;
-	oss << "Frame time " << std::setprecision(2) << g_timeElapsed / 1.0e6 << "ms";
+	oss << "Frame time " << std::setprecision(2) << g_timeElapsed / 1.0e6 << "ms Shadow " << g_shadowTime[0] / 1.0e6 << " | " << g_shadowTime[1] / 1.0e6;
 	nvgText(vg, 0, 0, oss.str().c_str(), nullptr);
 	
 	oss.str("");

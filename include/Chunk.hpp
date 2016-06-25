@@ -159,7 +159,7 @@ struct Chunk
 	Chunk();
 
 	void put(const math::ivec3 &p, CubeType type);
-	bool hasEdge(const math::ivec3 &p, Dir dir) const;
+	bool hasEdge(const math::ivec3 &p, Dir dir, bool ignore_neib_chunks) const;
 	void updateLight();
 
 	template<LightType lt>
