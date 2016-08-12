@@ -5,6 +5,7 @@
 #include <boost/timer/timer.hpp>
 #include <cassert>
 #include "blockType.hpp"
+#include "models.hpp"
 
 SunLightPropagationLayer::SunLightPropagationLayer() : isLoaded(false), isCannotBeLoaded(false)
 {
@@ -230,9 +231,8 @@ CubeType Chunk::rawCubeAt(const math::ivec3 &p) const
 	return cubes[((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z];
 }
 
-BlockData Chunk::getBlockData(const math::ivec3 &p) const
+BlockData Chunk::getBlockData(uint16_t index) const
 {
-	int index = ((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z;
 	auto iterator = blockData.find(index);
 	if (iterator == blockData.end())
 		return 0;
@@ -240,13 +240,53 @@ BlockData Chunk::getBlockData(const math::ivec3 &p) const
 	return iterator->second;
 }
 
+BlockData Chunk::getBlockData(const math::ivec3 &p) const
+{
+	uint16_t index = c2ind(p);
+	return getBlockData(index);
+}
+
 void Chunk::setBlockData(const math::ivec3 &p, BlockData data)
 {
-	int index = ((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z;
+	uint16_t index = c2ind(p);
 	if (data == 0)
 		blockData.erase(index);
 	else
 		blockData[index] = data;
+}
+
+void Chunk::updateObjects(const math::ivec3 &chunkPos, const math::ivec3 &p, CubeType c, BlockData data, const cyberCubes::model::ModelTextures &modelTextures)
+{
+	uint16_t index = c2ind(p);
+	
+	std::unique_ptr<cyberCubes::model::Model> mdl = cyberCubes::model::createModel(c);
+	cyberCubes::model::Model *ptr = mdl.get();
+	if (!ptr)
+	{
+		objects.erase(index);
+	}
+	else
+	{
+		objects[index] = std::move(mdl);
+		
+		ptr->rotation = decodeRotation(data);
+		ptr->position = chunkPos + p;
+		ptr->updateTextures(modelTextures);
+	}
+}
+
+void Chunk::createObjects(const math::ivec3 &chunkPos, const cyberCubes::model::ModelTextures &modelTextures)
+{
+	for (uint16_t i = 0; i < CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE; ++i)
+	{
+		CubeType c = cubes[i];
+		if (isModel(c))
+		{
+			math::ivec3 p = ind2c(i);
+			BlockData data = getBlockData(i);
+			updateObjects(chunkPos, p, c, data, modelTextures);
+		}
+	}
 }
 
 unsigned char Chunk::decodeRotation(BlockData data)

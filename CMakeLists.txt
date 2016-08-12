@@ -25,6 +25,13 @@ src/Inventory.cpp
 src/SoundSystem.cpp
 src/Input.cpp
 src/Math.cpp
+src/ModelRenderer.cpp
+src/ModelTextures.cpp
+src/GeomOcclusitionCulling.cpp
+
+src/models.cpp
+src/models/ModelWolf.cpp
+src/models/ModelChest.cpp
 
 ext/nanovg/src/nanovg.c
 )

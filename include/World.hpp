@@ -15,6 +15,9 @@
 #include "Player.hpp"
 #include "BlockingQueue.hpp"
 #include "GLQueryPool.hpp"
+#include "ModelTextures.hpp"
+#include "ModelRenderer.hpp"
+#include "models.hpp"
 
 #include <thread>
 #include <memory>
@@ -69,11 +72,16 @@ public:
 	math::vec3 sunDir;
 	math::vec3 fogColor;
 	float lightMultiplier = 1.0;
+	
+	cyberCubes::model::ModelTextures modelTextures;
+	cyberCubes::model::ModelRenderer modelRenderer;
+	cyberCubes::model::ModelRendererBuffer modelRendererBuffer;
 
 	void create();
 	void renderShadowMap(const Camera &camera, const cyberCubes::Player &player, float scale);
 	void renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint detailTexture,
-			 GLuint shadow_map_texture1, GLuint shadow_map_texture2, GLuint box_positions_texture1, GLuint box_positions_texture2, float shadow_scale1, float shadow_scale2);
+			GLuint shadow_map_texture1, GLuint shadow_map_texture2, GLuint box_positions_texture1, GLuint box_positions_texture2, float shadow_scale1, float shadow_scale2,
+			GLuint HSColorTexture);
 	void renderPass2(const Camera &camera, const cyberCubes::Player &player, const std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint HSColorTexture);
 	float getMaxLightNearPoint(const math::vec3 &v);
 

@@ -31,7 +31,9 @@
 #include "BlockRenderer.hpp"
 #include "SoundSystem.h"
 #include "Input.hpp"
+#include "ModelTextures.hpp"
 #include "ModelRenderer.hpp"
+#include "models.hpp"
 
 static const struct
 {
@@ -316,7 +318,7 @@ struct Globals
 	GLuint	detailTexture;
 	GLuint	frameBufferTexture1, frameBufferTexture2, frameBufferFinalTexture, HSColorTexture;
 	
-	model::Model testModel;
+	model::ModelChest testModel;
 	
 	
 } globals;
@@ -486,92 +488,6 @@ void loadTextures()
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
 	glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
 	std::cout << "Anisotropy level " << aniso << std::endl;
-}
-
-void generateModel()
-{
-	model::ModelBox box;
-	model::Model &testModel = globals.testModel;
-	
-	box.position = math::vec3(-1.0, -3.0, -14.0f);
-	box.offset = math::vec3(-4.0, -3.0, 3.0f);
-	box.size = math::vec3(8.0, 7.0, -6.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = M_PI / 2.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(0.0, 2.0, -14.0f);
-	box.offset = math::vec3(-4.0, -3.0, 2.0f);
-	box.size = math::vec3(6.0, 6.0, -9.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = M_PI / 2.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(-1.0, -7.0, -13.5f);
-	box.offset = math::vec3(-3.0, -2.0, 3.0f);
-	box.size = math::vec3(6.0, 4.0, -6.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(-0.5f, -7.0, -13.5f);
-	box.offset = math::vec3(-2.0f, -5.0f, 0.0f);
-	box.size = math::vec3(3.0, 4.0, -3.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(-1.0f, -7.0, -13.5f);
-	box.offset = math::vec3(1.0f, 0.0f, 5.0f);
-	box.size = math::vec3(2.0, 1.0, -2.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(-1.0f, -7.0, -13.5f);
-	box.offset = math::vec3(-3.0f, 0.0f, 5.0f);
-	box.size = math::vec3(2.0, 1.0, -2.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(0.5f, -4.0, -16.0f);
-	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
-	box.size = math::vec3(2.0, 2.0, -8.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(-2.5f, -4.0, -16.0f);
-	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
-	box.size = math::vec3(2.0, 2.0, -8.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(0.5f, 7.0, -16.0f);
-	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
-	box.size = math::vec3(2.0, 2.0, -8.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(-2.5f, 7.0, -16.0f);
-	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
-	box.size = math::vec3(2.0, 2.0, -8.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 0.0;
-	testModel.boxes.push_back(box);
-	
-	box.position = math::vec3(-1.0f, 8.0, -12.0f);
-	box.offset = math::vec3(-1.0f, -1.0f, 0.0f);
-	box.size = math::vec3(2.0, 2.0, -8.0f);
-	box.rotationFw = box.rotationUp = 0.0f;
-	box.rotationR = 1.13f;
-	testModel.boxes.push_back(box);
-	
-	
-	testModel.position = math::vec3(0.0, 0.0, 310.0f);
 }
 
 void renderHighlight(const math::ivec3 &bpos, const math::ivec3 &prevBPos)
@@ -804,9 +720,8 @@ int main()
 		return 0;
 	}*/
 	
-	generateModel();
-	
-	
+	globals.testModel.position = math::vec3(10.0, 0.0, 257.0f);
+	globals.testModel.setLidAngle(1.5);
 
 	loadTextures();
 	
@@ -895,7 +810,25 @@ int main()
 	if (!loadFonts(vg))
 		return -1;
 	
-	BlockRenderer renderer;
+	////////////////////////////////
+	
+	
+	/*math::ivec2 modelTexturesSize = math::ivec2(256, 256);
+	model::ModelTextures modelTextures(modelTexturesSize);
+	model::ModelRendererBuffer modelRendererBuffer;
+	model::ModelRenderer modelRenderer(modelTextures);
+	
+	modelTextures.addTexture("textures/entity/wolf/wolf.png", "wolf");
+	modelTextures.addTexture("textures/entity/chest/normal.png", "chest");
+	modelTextures.upload();
+	
+	math::vec2 invTextureSize = modelRenderer.getInvTextureSize();
+	
+	globals.testModel.updateTextures(modelTextures);*/
+	
+	////////////////////////////////
+	
+	BlockRenderer renderer(world.modelRenderer);
 	inventory = new Inventory(*vg, renderer);
 	inventory->setWindowSize(globals.width, globals.height);
 	
@@ -906,16 +839,6 @@ int main()
 	
 	input::MainInput input(&world, inventory, &camera);
 	
-	////////////////////////////////
-	
-	
-	
-	
-	model::ModelRendererBuffer modelRendererBuffer;
-	model::ModelRenderer modelRenderer;
-	
-	
-	////////////////////////////////
 	Shader simpleShader("simpleShader");
 	simpleShader.buildShaderProgram("simplevs.glsl", "simplefs.glsl");
 	
@@ -982,7 +905,7 @@ int main()
 		//std::cout << "dayNightLightCoef " << world.dayNightLightCoef << std::endl;
 		
 		float sunDirCoef = 0.1;
-		world.sunDir = math::vec3(cos(sunDirCoef*globalT), -sin(sunDirCoef*globalT), 1.0f);
+		world.sunDir = math::vec3(cos(sunDirCoef*globalT/10.0f), -sin(sunDirCoef*globalT/10.0f), 1.0f);
 		//world.sunDir = math::vec3(1.0f, 1.0f, 1.0f);
 		//world.sunDir = math::vec3(0.1f, 1.0f, 1.0f);
 		
@@ -996,7 +919,7 @@ int main()
 		if (shadow_mode != 4)
 		{ // Shadow map
 			glBindFramebuffer(GL_FRAMEBUFFER, shadow_map_framebuffer);
-			glPolygonOffset(1, 4.0);
+			glPolygonOffset(1, 1.0);
 			glEnable(GL_POLYGON_OFFSET_FILL);
 			
 			
@@ -1059,7 +982,9 @@ int main()
 			checkGLError("2");
 			//glEnable(GL_POLYGON_OFFSET_FILL);
 			player.updatePosition(camera.position);
-			world.renderPass1(camera, player, nonOpaqueChunks, blockTexture, globals.detailTexture, shadow_map_texture1, shadow_map_texture2, box_positions_texture1, box_positions_texture2, scale_shadow1, scale_shadow2);
+			world.renderPass1(camera, player, nonOpaqueChunks, blockTexture, globals.detailTexture, shadow_map_texture1, shadow_map_texture2, box_positions_texture1, box_positions_texture2, scale_shadow1, scale_shadow2,
+				globals.HSColorTexture
+			);
 			//glDisable(GL_POLYGON_OFFSET_FILL);
 
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE, 0, 0);
@@ -1115,7 +1040,7 @@ int main()
 
 			checkGLError("5");
 
-			if (quadShader.uniforms.count("HSColorSampler"))
+			if (quadShader.uniforms.count(""))
 			{
 				//std::cout << "HSColorSampler " << HSColorTexture << std::endl;
 				glUniform1i(quadShader.uniforms["HSColorSampler"], 3);
@@ -1235,8 +1160,9 @@ int main()
 			/*std::vector<model::Vertex> modelBuffer;
 			static float rt = 0.0f;
 			rt += 0.001f;
-			globals.testModel.boxes[0].rotationFw = rt;
-			globals.testModel.render(modelBuffer);
+			//globals.testModel.boxes[0].rotationFw = rt;
+			globals.testModel.rotation = 0;
+			globals.testModel.render(modelBuffer, invTextureSize);
 			modelRendererBuffer.upload(modelBuffer);
 			modelRenderer.startRender();
 			modelRenderer.render(modelRendererBuffer, camera);
@@ -1337,7 +1263,9 @@ int main()
 		}
 		
 		if (input.pressedKeys.count((SDLK_F5)))
+		{
 			shadow_mode = 0;
+		}
 		if (input.pressedKeys.count((SDLK_F6)))
 			shadow_mode = 1;
 		if (input.pressedKeys.count((SDLK_F7)))

@@ -4,7 +4,9 @@
 #include "Math.hpp"
 #include <atomic>
 #include <unordered_map>
+#include <memory>
 #include "types.hpp"
+#include "ModelRenderer.hpp"
 
 constexpr int MAX_LIGHT = 31;
 constexpr float MAX_LIGHT_F = MAX_LIGHT;
@@ -14,6 +16,23 @@ constexpr int CHUNK_SIZE_I = CHUNK_SIZE;
 constexpr float CHUNK_SIZE_F = CHUNK_SIZE;
 constexpr size_t CHUNK_SIZE_M1 = CHUNK_SIZE - 1;
 constexpr int CHUNK_SIZE_M1_I = CHUNK_SIZE_M1;
+
+constexpr uint16_t c2ind(const math::ivec3 &p)
+{
+	return ((p.x * CHUNK_SIZE) + p.y) * CHUNK_SIZE + p.z;
+}
+
+inline math::ivec3 ind2c(uint16_t ind)
+{
+	int z = ind % CHUNK_SIZE;
+	
+	int rem = ind / CHUNK_SIZE;
+	int y = rem % CHUNK_SIZE;
+	
+	int x = rem / CHUNK_SIZE;
+	
+	return math::ivec3(x, y, z);
+}
 
 enum LightType
 {
@@ -153,6 +172,7 @@ struct Chunk
 	CubeType cubes[CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
 	LightValue light[LIGHT_COUNT][CHUNK_SIZE *CHUNK_SIZE *CHUNK_SIZE];
 	std::unordered_map<uint16_t, BlockData> blockData;
+	std::unordered_map<uint16_t, std::unique_ptr<cyberCubes::model::Model> > objects;
 	
 	SunLightPropagationLayer *slpl;
 
@@ -182,8 +202,11 @@ struct Chunk
 
 	CubeType cubeAt(const math::ivec3 &p) const;
 	CubeType rawCubeAt(const math::ivec3 &p) const;
+	BlockData getBlockData(uint16_t index) const;
 	BlockData getBlockData(const math::ivec3 &p) const;
 	void setBlockData(const math::ivec3 &p, BlockData data);
+	void updateObjects(const math::ivec3 &chunkPos, const math::ivec3 &p, CubeType c, BlockData data, const cyberCubes::model::ModelTextures &modelTextures);
+	void createObjects(const math::ivec3 &chunkPos, const cyberCubes::model::ModelTextures &modelTextures);
 	static unsigned char decodeRotation(BlockData data);
 	
 	void computeSunLightPropagationLayer(SunLightPropagationLayer &layer) const;

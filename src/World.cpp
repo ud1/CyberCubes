@@ -18,6 +18,8 @@
 #include <chrono>
 #include <thread>
 
+#include "GeomOcclusitionCulling.hpp"
+
 const int S = 4;
 const int SZ = 16;
 
@@ -40,7 +42,8 @@ struct WorldProviderTransaction
 	WorldProvider &provider;
 };
 
-World::World() : oqShader("oqShader"), worldShaderPass1("worldShaderPass1"), worldShaderPass2("worldShaderPass2"), shadowMapPass("shadowMapShader")
+World::World() : oqShader("oqShader"), worldShaderPass1("worldShaderPass1"), worldShaderPass2("worldShaderPass2"), shadowMapPass("shadowMapShader"),
+modelTextures(math::ivec2(256, 256)), modelRenderer(modelTextures)
 {
 	_renderTick = 0;
 	_maxRenderDataMemoryUse = 700 * 1024 * 1024;
@@ -105,6 +108,8 @@ void World::_loadChunks()
 			break;
 		
 		worldProvider.fill(*request.chunk, request.chunkCoord);
+		math::ivec3 chunkPos = request.chunkCoord * CHUNK_SIZE_I;
+		request.chunk->createObjects(chunkPos, modelTextures);
 	}
 	_isLoadingThreadRunned.clear();
 }
@@ -885,6 +890,9 @@ bool World::putBlock(const math::ivec3 &v, CubeType c, BlockData data)
 	
 	chunk->put(bp, c);
 	chunk->setBlockData(bp, data);
+	
+	math::ivec3 chunkPos = eucDivChunk(v) * CHUNK_SIZE_I;
+	chunk->updateObjects(chunkPos, bp, c, data, modelTextures);
 
 	std::vector<AddedBlockLight> addedBlocks, addedSunLightBlocks;
 	std::vector<math::ivec3> removedBlocks, removedSunLightBlocks;
@@ -1118,6 +1126,10 @@ void World::create()
 	worldShaderPass1.buildShaderProgram("wvs.glsl", "wgs.glsl", "wfs.glsl");
 	worldShaderPass2.buildShaderProgram("wvs.glsl", "wgs2.glsl", "wfs2.glsl");
 	shadowMapPass.buildShaderProgram("shadowvs.glsl", "shadowgs.glsl", "shadowfs.glsl");
+	
+	modelTextures.addTexture("textures/entity/wolf/wolf.png", "wolf");
+	modelTextures.addTexture("textures/entity/chest/normal.png", "chest");
+	modelTextures.upload();
 }
 
 void World::_linkChunk(Chunk *chunk, const IntCoord &pos)
@@ -1340,7 +1352,9 @@ void World::renderShadowMap(const Camera &camera, const cyberCubes::Player &play
 }
 
 void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, std::vector<IntCoord> &nonOpaqueChunks, GLuint blockTexture, GLuint detailTexture,
-			GLuint shadow_map_texture1, GLuint shadow_map_texture2, GLuint box_positions_texture1, GLuint box_positions_texture2, float shadow_scale1, float shadow_scale2)
+			GLuint shadow_map_texture1, GLuint shadow_map_texture2, GLuint box_positions_texture1, GLuint box_positions_texture2, float shadow_scale1, float shadow_scale2,
+			GLuint HSColorTexture
+       		)
 {
 	++_renderTick;
 	
@@ -1381,6 +1395,12 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 	math::mat4 depthBiasMVP2 = biasMatrix * depthProjectionMatrix2 * depthViewMatrix2;
 	
 	/////////////////
+	
+	cyberCubes::GeomOcclusitionCulling culling(camera.position);
+	int oq_tested = 0;
+	int culled1 = 0;
+	int culled2 = 0;
+	int oq_checks = 0;
 
 	typedef std::multimap<float, IntCoord> VisibleChunksMap;
 	VisibleChunksMap visibleChunks;
@@ -1599,6 +1619,13 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 			glBindTexture(GL_TEXTURE_2D, box_positions_texture2);
 		}
 		
+		if (worldShaderPass2.uniforms.count("HSColorSampler"))
+		{
+			glUniform1i(worldShaderPass2.uniforms["HSColorSampler"], 6);
+			glActiveTexture(GL_TEXTURE0 + 6);
+			glBindTexture(GL_TEXTURE_2D, HSColorTexture);
+		}
+		
 		
 		if (worldShaderPass1.uniforms.count("depthBiasMVP1"))
 			glUniformMatrix4fv(worldShaderPass1.uniforms["depthBiasMVP1"], 1, GL_FALSE, &depthBiasMVP1[0][0]);
@@ -1615,6 +1642,18 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 			math::vec3 sunLightDirInv = 1.0f/math::normalize(sunDir);
 			
 			glUniform3fv(worldShaderPass1.uniforms["sunLightDirInv"], 1, &sunLightDirInv[0]);
+		}
+		
+		if (worldShaderPass1.uniforms.count("sunLightDir"))
+		{
+			math::vec3 sunLightDir = math::normalize(sunDir);
+			
+			glUniform3fv(worldShaderPass1.uniforms["sunLightDir"], 1, &sunLightDir[0]);
+		}
+		
+		if (worldShaderPass1.uniforms.count("cameraPos"))
+		{
+			glUniform3fv(worldShaderPass1.uniforms["cameraPos"], 1, &camera.position[0]);
 		}
 		
 		if (worldShaderPass1.uniforms.count("mode"))
@@ -1685,26 +1724,48 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 		{
 			IntCoord &c = visibleChunksVector[i];
 
-			GLuint queryId = oqIds[c] = queryPool.getQueryId();
-			glBeginQuery(GL_ANY_SAMPLES_PASSED, queryId);
-			//std::cout << "Query " << c.get<0>() << " " << c.get<1>() << " " << c.get<2>() << " " << oqIds[c] << std::endl;
-
 			math::vec3 pos = i2f(c) * CHUNK_SIZE_F - math::vec3(0.5f, 0.5f, 0.5f);
+			
+			oq_tested++;
+			bool geom_occlusition = culling.isOccluded(pos);
+			//bool geom_occlusition = false;
+			if (geom_occlusition)
+			{
+				oqVisibleChunksVector.push_back(false);
+				culled1++;
+			}
+			else
+			{
+				oqVisibleChunksVector.push_back(true);
+				GLuint queryId = oqIds[c] = queryPool.getQueryId();
+				glBeginQuery(GL_ANY_SAMPLES_PASSED, queryId);
+				//std::cout << "Query " << c.get<0>() << " " << c.get<1>() << " " << c.get<2>() << " " << oqIds[c] << std::endl;
+				glUniform3fv(oqShader.uniforms["chunkPosition"], 1, &pos[0]);
+				glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, NULL);
 
-			glUniform3fv(oqShader.uniforms["chunkPosition"], 1, &pos[0]);
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, NULL);
-
-			glEndQuery(GL_ANY_SAMPLES_PASSED);
+				glEndQuery(GL_ANY_SAMPLES_PASSED);
+			}
 		}
 
 		for (size_t i = n; i < (n + l) && i < visibleChunksVector.size(); ++i)
 		{
-			IntCoord &c = visibleChunksVector[i];
-			GLuint params;
-			GLuint queryId = oqIds[c];
-			glGetQueryObjectuiv(queryId, GL_QUERY_RESULT, &params);
-			queryPool.releaseQueryId(queryId);
-			oqVisibleChunksVector.push_back(params == 1);
+			if (oqVisibleChunksVector[i])
+			{
+				IntCoord &c = visibleChunksVector[i];
+				GLuint params;
+				GLuint queryId = oqIds[c];
+				glGetQueryObjectuiv(queryId, GL_QUERY_RESULT, &params);
+				queryPool.releaseQueryId(queryId);
+				oqVisibleChunksVector[i] = (params == 1);
+				
+				oq_checks++;
+				if (params == 0)
+				{
+					math::vec3 pos = i2f(c) * CHUNK_SIZE_F - math::vec3(0.5f, 0.5f, 0.5f);
+					culling.addOccluder(pos);
+					culled2++;
+				}
+			}
 		}
 
 		//glDisableVertexAttribArray(0);
@@ -1714,6 +1775,41 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glDepthMask(GL_TRUE);
+	
+	/////////////////////////////////////////////////////////////////////////
+	math::vec2 invTextureSize = modelRenderer.getInvTextureSize();
+	std::vector<cyberCubes::model::Vertex> modelBuffer;
+	for (const IntCoord &c : nonOpaqueChunks)
+	{
+		Chunk &chunk = *chunks[c];
+		for (auto &p : chunk.objects)
+		{
+			math::ivec3 pos = ind2c(p.first);
+			cyberCubes::model::Model *model = p.second.get();
+			glm::ivec4 light = chunk.rawLightAt<LIGHT_SUNRGBA>(pos);
+			
+			model->colors[0] = (unsigned char) (light.x*255.0/MAX_LIGHT_F);
+			model->colors[1] = (unsigned char) (light.y*255.0/MAX_LIGHT_F);
+			model->colors[2] = (unsigned char) (light.z*255.0/MAX_LIGHT_F);
+			model->colors[3] = (unsigned char) (light.w*255.0/MAX_LIGHT_F);
+			
+			model->render(modelBuffer, invTextureSize);
+		}
+		
+		
+	}
+	
+	if (!modelBuffer.empty())
+	{
+		modelRendererBuffer.upload(modelBuffer);
+		
+		modelRenderer.startRender();
+		modelRenderer.render(modelRendererBuffer, MVP);
+		modelRenderer.finishRender();
+	}
+	
+	
+	/////////////////////////////////////////////////////////////////////////
 
 	extern int g_trisRendered ;
 	g_trisRendered = trisRendred;
@@ -1721,6 +1817,8 @@ void World::renderPass1(const Camera &camera, const cyberCubes::Player &player, 
 	//std::cout << "Chunk Mem " << chunks.size()*sizeof(Chunk)/1024.0/1024.0 << " MB, " << pendingChunks.size()*sizeof(Chunk)/1024.0/1024.0 << " MB" << std::endl;
 	
 	//std::cout << dirty1 << " " << dirty2 << std::endl;
+	
+	//std::cout << "CULLED " << culled1 << " " << culled2 << " " << oq_checks << " " << oq_tested << " " << occluded << std::endl;
 	
 	releaseOldRenderData();
 	_unloadUnusedChunks();

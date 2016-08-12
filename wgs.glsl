@@ -27,6 +27,7 @@ flat out mat2 fglightMat;
 flat out mat2 fslightMat;
 flat out float fdotNormalSunLight;
 flat out vec3 boxPos;
+flat out vec3 normal;
 
 const mat2 texMat[8]  = mat2[8](mat2(1,0, 0,1), mat2(0,-1, 1,0), mat2(-1,0, 0,-1), mat2(0,1, -1,0),  mat2(-1,0, 0,1), mat2(0,-1, -1,0), mat2(1,0, 0,-1), mat2(0,1, 1,0));
 const vec3 normals[6] = vec3[6](vec3(-0.5, 0, 0), vec3(0.5, 0, 0), vec3(0, -0.5, 0), vec3(0, 0.5, 0), vec3(0, 0, -0.5), vec3(0, 0, 0.5));
@@ -35,6 +36,7 @@ const vec3 t2s[6]     = vec3[6](vec3(0, 0, 0.5), vec3(0, 0, 0.5), vec3(0, 0, 0.5
 
 void main() {
 	vec3 norm = normals[gnormalIndex[0]];
+	normal = 2.0*norm;
 	fdotNormalSunLight = 2.0*dot(norm, sunLightDir);
 	vec3 t1 = t1s[gnormalIndex[0]];
 	vec3 t2 = t2s[gnormalIndex[0]];

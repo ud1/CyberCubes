@@ -16,8 +16,11 @@ flat in mat2 fglightMat;
 flat in mat2 fslightMat;
 flat in float fdotNormalSunLight;
 flat in vec3 boxPos;
+flat in vec3 normal;
 
+uniform vec3 sunLightDir;
 uniform vec3 sunLightDirInv;
+uniform vec3 cameraPos;
 uniform float fogFar;
 uniform sampler2DArray blockSampler;
 uniform sampler2D detailSampler;
@@ -25,6 +28,7 @@ uniform sampler2DShadow shadowSampler1;
 uniform sampler2DShadow shadowSampler2;
 uniform sampler2D shadowBoxPosSampler1;
 uniform sampler2D shadowBoxPosSampler2;
+uniform sampler2D HSColorSampler;
 uniform int mode;
 
 bool inside01(vec2 v)
@@ -113,7 +117,8 @@ void main()
 					visibility = texture( shadowSampler2, vec3(shadowCoord2.xy, (shadowCoord2.z)/shadowCoord2.w) );
 			}
 			
-			if ((mode == 1 || mode == 2 || mode == 3) && visibility > 0)
+			if ((mode == 1 || mode == 2 || mode == 3) && visibility > 0// && visibility < 1
+			)
 			{
 				if (mode == 3)
 					visibility = 1;
@@ -129,12 +134,24 @@ void main()
 			
 			//vec2 tcoord = floor(shadowCoord2.xy*textureSize(shadowBoxPosSampler1, 0).xy);
 			//visibility = 0.7*visibility + 0.3*fract((tcoord.x + tcoord.y)/2);
+			
+			/*if (visibility > 0)
+			{
+				vec3 viewDir = normalize(cameraPos - fcoord);
+				vec3 H = normalize( sunLightDir + viewDir );
+				float NdotH = dot( normal, H );
+				visibility += 1.0*pow( clamp( NdotH, 0, 1 ), 50 );
+				//visibility = 10*clamp( NdotH, 0, 1 );
+			}*/
 		}
 		
 		visibility = visibility + 1;
 	}
 
-	outputData1 = vec4(fogFactor, texture(blockSampler, vec3(texCoord + shift, ftextureId - 1)).rgb * (vec3(1.0, 1.0, 1.0) + detailColor2 * 0.4) * visibility);
+	vec3 sun_color = vec3(1, 1, 1) * (pow(0.02, 1.0 - slight) - 0.02*(1.0 - slight));
+	vec3 color = texture(HSColorSampler, fcolor).rgb * (pow(0.02, 1.0 - glight) - 0.02*(1.0 - glight)) * 3.0;
+	
+	outputData1 = vec4(texture(blockSampler, vec3(texCoord + shift, ftextureId - 1)).rgb * (vec3(1.0, 1.0, 1.0) + detailColor2 * 0.4) * visibility * max(sun_color, color), fogFactor);
 	
 	outputData2 = vec4(glight, slight, fcolor);
 	//outputData3 = vec4(dFdx(texCoord), dFdy(texCoord));

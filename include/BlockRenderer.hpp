@@ -2,7 +2,9 @@
 #define BLOCK_RENDERER_H
 
 #include <GL/glew.h>
+#include <unordered_map>
 
+#include "ModelRenderer.hpp"
 #include "Block.hpp"
 #include "Math.hpp"
 #include "Shader.hpp"
@@ -13,7 +15,7 @@ namespace render {
 class BlockRenderer
 {
 public:
-	BlockRenderer();
+	BlockRenderer(model::ModelRenderer &modelRenderer);
 	void renderInventoryBlock(const Block *block, const math::mat4 &mvp);
 	
 private:
@@ -21,6 +23,8 @@ private:
 	GLuint simpleBlockVao = 0;
 	GLuint simpleBlockBufferObject = 0;
 	
+	model::ModelRenderer &modelRenderer;
+	std::unordered_map<int, cyberCubes::model::ModelRendererBuffer> modelBuffers;
 };
 
 }}

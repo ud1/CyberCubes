@@ -133,17 +133,22 @@ inline bool isOpaque(CubeType type)
 
 inline bool isSunFullyTransparent(CubeType type)
 {
-	return type == 0 || type >= 30000 && type < 35000;
+	return type == 0 || type >= 30000 && type < 40000;
 }
 
 inline bool isLightTransparent(CubeType type)
 {
-	return type == 0 || type >= 30000 && type < 35000;
+	return type == 0 || type >= 30000 && type < 40000;
 }
 
 inline bool isSolid(CubeType type)
 {
 	return isOpaque(type) || type >= 30000 && type < 31000;
+}
+
+inline bool isModel(CubeType type)
+{
+	return type >= 31000;
 }
 
 #endif

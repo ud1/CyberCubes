@@ -44,7 +44,7 @@ public:
 		return false;
 	}
 
-protected:
+private:
 	struct Node
 	{
 		Node(const math::ivec2 &size, const math::ivec2 &position) : rc(size, position)
@@ -61,12 +61,12 @@ protected:
 	{
 		if (node.child[0]) // we're not a leaf
 		{
-			Node *newNode = insert(node.child[0], rc);
+			Node *newNode = insert(*node.child[0], rc);
 
 			if (newNode)
 				return newNode;
 
-			return insert(node.child[1], rc);
+			return insert(*node.child[1], rc);
 		}
 		else
 		{

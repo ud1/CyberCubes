@@ -419,4 +419,11 @@ block.name = "glass_orange_orig";
 block.mainTexture = "textures/glass_orange_orig.png";
 block:registerBlock();
 
+--------------------------------------------- Model blocks ---------------------------------------------
+block = Block:new();
+block.id = 35054;
+block.name = "chest";
+block.rotationGroup = 4;
+block:registerBlock();
+
 print "Configure finish"
